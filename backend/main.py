@@ -285,9 +285,9 @@ async def leaderboard(request: Request):
                 SELECT
                     COALESCE(NULLIF(TRIM(sold_by),''), 'Unknown') AS staff,
                     SUM({REV}) AS revenue,
-                    COUNT(DISTINCT base_invoice_no) AS invoice_count,
+                    COUNT(DISTINCT row_id) AS invoice_count,
                     SUM(qty) AS units_sold,
-                    SAFE_DIVIDE(SUM({REV}), COUNT(DISTINCT base_invoice_no)) AS avg_ticket
+                    SAFE_DIVIDE(SUM({REV}), COUNT(DISTINCT row_id)) AS avg_ticket
                 FROM {table}
                 WHERE {BASE.format(start=start_str, end=today)}
                 GROUP BY staff
@@ -353,7 +353,7 @@ async def leaderboard(request: Request):
                 SELECT
                     COALESCE(NULLIF(TRIM(serviced_by),''), 'N/A') AS servicer,
                     SUM({REV}) AS revenue,
-                    COUNT(DISTINCT base_invoice_no) AS invoices
+                    COUNT(DISTINCT row_id) AS invoices
                 FROM {table}
                 WHERE {BASE.format(start=start_str, end=today)}
                 GROUP BY servicer HAVING revenue > 0 ORDER BY revenue DESC LIMIT 15
@@ -373,7 +373,7 @@ async def leaderboard(request: Request):
             q = f"""
                 SELECT
                     COALESCE(NULLIF(TRIM(referral_source),''), 'Not specified') AS source,
-                    COUNT(DISTINCT base_invoice_no) AS count,
+                    COUNT(DISTINCT row_id) AS count,
                     SUM({REV}) AS revenue
                 FROM {table}
                 WHERE {BASE.format(start=start_str, end=today)}
