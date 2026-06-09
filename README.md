@@ -1,88 +1,134 @@
-# Tactical Dashboard
+# Evolve SPA Dashboard
 
-Revenue dashboard replicating the MTD/projected/category breakdown layout, backed by BigQuery's `sales_accrual` table.
+A single-page tactical dashboard for revenue, leaderboard, and appointment analytics.
+
+The app is split into:
+- `backend/` — FastAPI Python service querying BigQuery
+- `frontend/` — React SPA with charts and filters
 
 ## Project Structure
 
 ```
-tactical-dashboard/
-├── backend/          ← FastAPI (Python)
+evolve_spa_dashboard/
+├── backend/
 │   ├── main.py
 │   ├── requirements.txt
 │   ├── Procfile
 │   └── railway.json
-├── frontend/         ← React
-│   ├── src/
-│   │   ├── App.js / App.css
-│   │   ├── components/
-│   │   │   ├── KpiCard.jsx
-│   │   │   ├── RevenueChart.jsx
-│   │   │   ├── CategoryChart.jsx
-│   │   │   └── WeeklyTable.jsx
-│   │   ├── hooks/useDashboard.js
-│   │   └── utils/api.js, format.js
-│   ├── public/index.html
-│   └── railway.json
-└── .gitignore
+├── frontend/
+│   ├── package.json
+│   ├── public/
+│   │   └── index.html
+│   └── src/
+│       ├── App.js
+│       ├── App.css
+│       ├── components/
+│       │   ├── Appointments.jsx
+│       │   ├── Leaderboard.jsx
+│       │   └── Revenue.jsx
+│       ├── hooks/
+│       │   └── useDashboard.js
+│       └── utils/
+│           ├── api.js
+│           └── format.js
+└── README.md
 ```
+
+## Features
+
+- Revenue KPIs, projection, daily performance, category breakdown, and weekly pace
+- Staff leaderboard, service type revenue, and referral source analytics
+- Appointment analytics by status, category, provider, booking source, hourly distribution, and rebook rate
+- Center-level filtering for revenue and appointments
+- Uses BigQuery data for live dashboard metrics
 
 ## Local Development
 
 ### Backend
+
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-cp .env.example .env   # fill in your values
+```
+
+Create a local env file in `backend/` (for example `.env`) with the variables below.
+
+Run the backend:
+
+```bash
 uvicorn main:app --reload --port 8000
 ```
 
 ### Frontend
+
 ```bash
 cd frontend
 npm install
-cp .env.example .env   # set REACT_APP_API_URL=http://localhost:8000
 npm start
 ```
 
-## Railway Deployment
+The frontend expects `REACT_APP_API_URL` to point to the backend, for example `http://localhost:8000`.
 
-Deploy backend and frontend as **two separate Railway services** from the same GitHub repo.
+## Backend Environment Variables
 
-### 1. Backend Service
-- **Root directory**: `backend`
-- **Environment variables** (set in Railway dashboard):
-  | Variable | Value |
-  |---|---|
-  | `BIGQUERY_PROJECT_ID` | your GCP project ID |
-  | `BIGQUERY_DATASET` | your dataset name |
-  | `BIGQUERY_TABLE` | `sales_accrual` |
-  | `BIGQUERY_SERVICE_ACCOUNT_JSON` | paste full JSON content of your service account key |
-  | `MONTHLY_GOAL` | e.g. `10000000` |
-
-### 2. Frontend Service
-- **Root directory**: `frontend`
-- **Environment variables**:
-  | Variable | Value |
-  |---|---|
-  | `REACT_APP_API_URL` | your backend Railway URL (e.g. `https://backend-xxx.railway.app`) |
-
-> ⚠️ Never commit `bigquery_service_account.json` or `.env` files. Use Railway's env variable UI to set `BIGQUERY_SERVICE_ACCOUNT_JSON`.
-
-## BigQuery Credentials (Railway)
-
-1. In GCP → IAM → Service Accounts, create a service account with **BigQuery Data Viewer** + **BigQuery Job User** roles.
-2. Download the JSON key.
-3. In Railway → your backend service → Variables, create `BIGQUERY_SERVICE_ACCOUNT_JSON` and paste the entire JSON content as the value.
-
-## Environment Variables Reference
+The backend reads credentials and BigQuery settings from environment variables.
 
 | Variable | Required | Description |
 |---|---|---|
 | `BIGQUERY_PROJECT_ID` | ✅ | GCP project ID |
 | `BIGQUERY_DATASET` | ✅ | BigQuery dataset name |
-| `BIGQUERY_TABLE` | ✅ | Table name (default: `sales_accrual`) |
-| `BIGQUERY_SERVICE_ACCOUNT_JSON` | ✅ (Railway) | Full service account JSON string |
-| `BIGQUERY_SERVICE_ACCOUNT_PATH` | local only | Path to JSON file |
-| `MONTHLY_GOAL` | optional | Revenue goal for the goal line |
-| `REACT_APP_API_URL` | ✅ frontend | Backend URL |
+| `BIGQUERY_TABLE` | ✅ | Default table name is `sales_accrual` |
+| `BIGQUERY_APPT_TABLE` | ✅ | Appointment table used by `appointments` API |
+| `GOOGLE_APPLICATION_CREDENTIALS` | ✅ local | Path to your BigQuery service account JSON file |
+| `BIGQUERY_CREDENTIALS_BASE64` | ✅ deployment | Base64-encoded JSON service account content |
+| `MONTHLY_GOAL` | optional | Numeric revenue goal for dashboard progress |
+| `PORT` | optional | Backend port, defaults to `8000` |
+
+> ⚠️ Do not commit service account keys or `.env` files to version control.
+
+## API Endpoints
+
+### Health
+- `GET /health`
+
+### Center data
+- `GET /api/centers` — revenue center list
+- `GET /api/appointment_centers` — appointment center list
+
+### Revenue APIs
+- `POST /api/revenue`
+  - body: `{ action, month, center }`
+  - supported actions: `summary`, `daily`, `categories`, `weekly`
+- `POST /api/dashboard` — alias for `/api/revenue`
+
+### Leaderboard APIs
+- `POST /api/leaderboard`
+  - body: `{ action, month, center }`
+  - supported actions: `staff`, `service_types`, `referrals`, `staff_trend`
+
+### Appointment APIs
+- `POST /api/appointments`
+  - body: `{ action, month, center }`
+  - supported actions: `summary`, `daily`, `by_status`, `by_category`, `by_provider`, `by_booking_source`, `by_hour`, `rebook_rate`
+
+## Deployment Notes
+
+- `backend/Procfile` is configured for a Python FastAPI deploy.
+- `frontend/package.json` includes `start`, `build`, and `serve` scripts.
+- For cloud deployment, set credentials using `BIGQUERY_CREDENTIALS_BASE64` instead of a local JSON file.
+
+## Quick Start
+
+1. Configure backend env vars.
+2. Start the backend on `http://localhost:8000`.
+3. Set `REACT_APP_API_URL=http://localhost:8000` in frontend environment.
+4. Start the frontend with `npm start`.
+
+## Useful Commands
+
+- Backend install: `pip install -r backend/requirements.txt`
+- Backend run: `uvicorn backend.main:app --reload --port 8000`
+- Frontend install: `cd frontend && npm install`
+- Frontend run: `cd frontend && npm start`

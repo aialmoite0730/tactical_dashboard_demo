@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
-import Revenue     from "./components/Revenue";
-import Leaderboard from "./components/Leaderboard";
+import { useState, useEffect } from "react";
+import Revenue      from "./components/Revenue";
+import Leaderboard  from "./components/Leaderboard";
+import Appointments from "./components/Appointments";
 
 // ─── Config ────────────────────────────────────────────────
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000";
 const MONTHS   = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const YEARS    = [2024, 2025, 2026];
 const TABS = [
-  { id: "revenue",     label: "📈 Revenue",     icon: "📈" },
-  { id: "leaderboard", label: "🏆 Leaderboard",  icon: "🏆" },
+  { id: "revenue",      label: "📈 Revenue"      },
+  { id: "leaderboard",  label: "🏆 Leaderboard"  },
+  { id: "appointments", label: "📅 Appointments" },
 ];
 
 function monthStr(monthName, year) {
@@ -18,38 +20,52 @@ function monthStr(monthName, year) {
 
 export default function App() {
   const now = new Date();
+  
+  // Core Filters
   const [tab,           setTab]           = useState("revenue");
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
   const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
-  
-  // staged values — only committed on Apply
-  const [stagedMonth,   setStagedMonth]   = useState(MONTHS[now.getMonth()]);
-  const [stagedYear,    setStagedYear]    = useState(now.getFullYear());
   const [center,        setCenter]        = useState("All");
-  const [stagedCenter,  setStagedCenter]  = useState("All");
-  const [centers,       setCenters]       = useState([]);
-  const [centersLoaded, setCentersLoaded] = useState(false);
-  
-  // trigger re-load in child by bumping this key
-  const [refreshKey,    setRefreshKey]    = useState(0);
-  const month = monthStr(selectedMonth, selectedYear);
 
-  // Load center list once
+  // Center Lists (Separated for Revenue vs Appointments)
+  const [centers,       setCenters]       = useState([]);
+  const [apptCenters,   setApptCenters]   = useState([]);
+  const [centersLoaded, setCentersLoaded] = useState(false);
+
+  // Refresh trigger
+  const [refreshKey,    setRefreshKey]    = useState(0);
+  
+  // Derived values
+  const month = monthStr(selectedMonth, selectedYear);
+  const activeCenters = tab === "appointments" ? apptCenters : centers;
+
+  // 1. Load BOTH center lists once on mount
   useEffect(() => {
+    let loadedCount = 0;
+    const checkDone = () => {
+      loadedCount++;
+      if (loadedCount === 2) setCentersLoaded(true);
+    };
+
     fetch(`${API_BASE}/api/centers`)
       .then(r => r.json())
-      .then(d => { setCenters(d.centers || []); setCentersLoaded(true); })
-      .catch(() => setCentersLoaded(true));
+      .then(d => { setCenters(d.centers || []); checkDone(); })
+      .catch(() => checkDone());
+
+    fetch(`${API_BASE}/api/appointment_centers`)
+      .then(r => r.json())
+      .then(d => { setApptCenters(d.centers || []); checkDone(); })
+      .catch(() => checkDone());
   }, []);
 
-  const handleApply = () => {
-    setSelectedMonth(stagedMonth);
-    setSelectedYear(stagedYear);
-    setCenter(stagedCenter);
-    setRefreshKey(k => k + 1);
-  };
-
-  const handleRefresh = () => setRefreshKey(k => k + 1);
+  // 2. Auto-reset center to "All" if switching tabs makes the current center invalid
+  useEffect(() => {
+    if (!centersLoaded) return; // Wait until lists are loaded
+    if (center !== "All" && !activeCenters.includes(center)) {
+      setCenter("All");
+      setRefreshKey(k => k + 1);
+    }
+  }, [tab, activeCenters, center, centersLoaded]);
 
   return (
     <>
@@ -92,18 +108,6 @@ export default function App() {
           background:var(--surface); color:var(--text); cursor:pointer;
         }
         .hdr-select:focus { outline:none; border-color:#a0845c; }
-        .apply-btn {
-          font-family:inherit; font-size:12px; font-weight:700; padding:6px 16px;
-          border:none; border-radius:6px; background:var(--accent-bar); color:#fff;
-          cursor:pointer; letter-spacing:0.03em; transition:opacity 0.15s;
-        }
-        .apply-btn:hover { opacity:0.85; }
-        .refresh-btn {
-          font-size:14px; background:none; border:1px solid var(--border);
-          border-radius:6px; padding:4px 10px; cursor:pointer; color:var(--text-muted);
-          transition:color 0.15s;
-        }
-        .refresh-btn:hover { color:var(--text); }
         .hdr-divider { width:1px; height:24px; background:var(--border); margin:0 4px; }
 
         /* ── Tab bar ── */
@@ -164,7 +168,7 @@ export default function App() {
         }
         .chart-title { font-size:11px; color:var(--text-muted); font-style:italic; margin-bottom:8px; }
         .chart-empty { color:var(--text-muted); font-size:12px; padding:40px; text-align:center; }
-        .chart-legend-row { display:flex; gap:14px; margin-bottom:6px; font-size:10px; color:var(--text-muted); } 
+        .chart-legend-row { display:flex; gap:14px; margin-bottom:6px; font-size:10px; color:var(--text-muted); }
 
         /* ── Category chart ── */
         .category-card { display:flex; flex-direction:column; }
@@ -206,7 +210,7 @@ export default function App() {
           background:var(--surface-2); border:1px solid var(--border);
           border-radius:6px; padding:8px 12px; font-size:11px;
           box-shadow:0 4px 12px rgba(0,0,0,0.1);
-        } 
+        }
         .tooltip-date { font-weight:700; margin-bottom:3px; }
         .tooltip-row  { display:flex; justify-content:space-between; gap:12px; }
 
@@ -234,25 +238,21 @@ export default function App() {
       <header className="header">
         <div className="header-brand">Tactical Dashboard</div>
         <div className="header-right">
-          {/* Center filter */}
-          <select className="hdr-select" value={stagedCenter}
-                  onChange={e => setStagedCenter(e.target.value)}
+          <select className="hdr-select" value={center}
+                  onChange={e => { setCenter(e.target.value); setRefreshKey(k => k + 1); }}
                   style={{maxWidth:160}}>
             <option value="All">All Centers</option>
-            {centers.map(c => <option key={c} value={c}>{c}</option>)}
+            {activeCenters.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <div className="hdr-divider"/>
-          {/* Month/Year pickers */}
-          <select className="hdr-select" value={stagedYear}
-                  onChange={e => setStagedYear(Number(e.target.value))}>
+          <select className="hdr-select" value={selectedYear}
+                  onChange={e => { setSelectedYear(Number(e.target.value)); setRefreshKey(k => k + 1); }}>
             {YEARS.map(y => <option key={y}>{y}</option>)}
           </select>
-          <select className="hdr-select" value={stagedMonth}
-                  onChange={e => setStagedMonth(e.target.value)}>
+          <select className="hdr-select" value={selectedMonth}
+                  onChange={e => { setSelectedMonth(e.target.value); setRefreshKey(k => k + 1); }}>
             {MONTHS.map(m => <option key={m}>{m}</option>)}
           </select>
-          <button className="apply-btn" onClick={handleApply}>▶ Apply</button>
-          <button className="refresh-btn" onClick={handleRefresh} title="Refresh">↻</button>
         </div>
       </header>
 
@@ -274,8 +274,9 @@ export default function App() {
       </div>
 
       {/* ── Dashboard panels ── */}
-      {tab === "revenue"      && <Revenue     key={`rev-${refreshKey}`} apiBase={API_BASE} month={month} center={center} />}
-      {tab === "leaderboard"  && <Leaderboard key={`lb-${refreshKey}`}  apiBase={API_BASE} month={month} center={center} />}
+      {tab === "revenue"      && <Revenue      key={`rev-${refreshKey}`}  apiBase={API_BASE} month={month} center={center} />}
+      {tab === "leaderboard"  && <Leaderboard  key={`lb-${refreshKey}`}   apiBase={API_BASE} month={month} center={center} />}
+      {tab === "appointments" && <Appointments key={`appt-${refreshKey}`} apiBase={API_BASE} month={month} center={center} />}
     </>
   );
 }
