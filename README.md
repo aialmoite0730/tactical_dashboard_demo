@@ -1,46 +1,77 @@
-# Evolve SPA Dashboard
+# Evolve Med Spa — Tactical Dashboard
 
-A single-page tactical dashboard for revenue, leaderboard, and appointment analytics.
+A full-stack tactical dashboard for revenue, leaderboard, appointment, and utilization analytics, powered by BigQuery and optionally enriched with AI-generated insights (OpenAI / Gemini).
 
-The app is split into:
-- `backend/` — FastAPI Python service querying BigQuery
-- `frontend/` — React SPA with charts and filters
+---
 
 ## Project Structure
 
 ```
 evolve_spa_dashboard/
 ├── backend/
-│   ├── main.py
+│   ├── main.py                    # FastAPI entry point — wires all routers
 │   ├── requirements.txt
-│   ├── Procfile
-│   └── railway.json
-├── frontend/
-│   ├── package.json
-│   ├── public/
-│   │   └── index.html
-│   └── src/
-│       ├── App.js
-│       ├── App.css
-│       ├── components/
-│       │   ├── Appointments.jsx
-│       │   ├── Leaderboard.jsx
-│       │   └── Revenue.jsx
-│       ├── hooks/
-│       │   └── useDashboard.js
-│       └── utils/
-│           ├── api.js
-│           └── format.js
-└── README.md
+│   ├── Procfile                   # Deployment: uvicorn main:app
+│   ├── railway.json
+│   ├── .env                       # Local env vars (not committed)
+│   ├── bigquery_service_account.json   # Local only (not committed)
+│   ├── core/
+│   │   └── config.py              # BQ client, table refs, date helpers, run_query_async
+│   ├── routers/
+│   │   ├── centers.py             # GET /api/centers + /api/appointment_centers
+│   │   ├── revenue.py             # POST /api/revenue  (+ /api/dashboard legacy alias)
+│   │   ├── leaderboard.py         # POST /api/leaderboard
+│   │   ├── appointments.py        # POST /api/appointments
+│   │   ├── utilization.py         # POST /api/utilization
+│   │   └── insights.py            # POST /api/insights  (AI: OpenAI → Gemini fallback)
+│   └── utils/
+│       └── errors.py              # Centralised error_response() helper
+│
+└── frontend/
+    ├── public/
+    │   └── index.html
+    └── src/
+        ├── App.js                 # Root: tabs, filters, center lists, AI data relay
+        ├── App.css                # All styles (design tokens, layout, components)
+        ├── index.js
+        ├── index.css
+        ├── components/
+        │   ├── Revenue.jsx        # Revenue KPIs, charts, ASP, cash sales
+        │   ├── Leaderboard.jsx    # Staff ranking, servicer table, referrals
+        │   ├── Appointments.jsx   # Appointment KPIs, status, category, provider charts
+        │   ├── Utilization.jsx    # Provider util %, revenue/hr, role summary
+        │   └── AiInsights.jsx     # AI panel — auto-generates on tab/filter change
+        ├── hooks/
+        │   └── useDashboard.js    # Optional hook for revenue data (legacy-compatible)
+        └── utils/
+            ├── api.js             # Typed fetch helpers for all endpoints
+            └── format.js          # Currency, number, date, % formatters
 ```
+
+---
 
 ## Features
 
-- Revenue KPIs, projection, daily performance, category breakdown, and weekly pace
-- Staff leaderboard, service type revenue, and referral source analytics
-- Appointment analytics by status, category, provider, booking source, hourly distribution, and rebook rate
-- Center-level filtering for revenue and appointments
-- Uses BigQuery data for live dashboard metrics
+| Tab | Metrics |
+|---|---|
+| **Revenue** | MTD revenue, projected, rev/day, rev/hr, 30-day ADV, **ASP** (revenue ÷ invoices), **cash sales**, goal progress bar, daily chart, sales mix donut, weekly WoW table |
+| **Leaderboard** | Staff ranking with **ASP per staff**, servicer table with **ASP column**, referral source bars |
+| **Appointments** | Total, closed, no-show rate, cancel rate, **rebook rate (rebooked ÷ closed)**, first-visit rate, utilisation %, add-ons, category/provider/booking source/hourly charts |
+| **Utilization** | Provider util % (booked ÷ scheduled), **revenue/utilized hour** (sales ÷ booked hrs joined on serviced_by + date + center), role summary table |
+| **AI Insights** | Auto-generates on every tab/filter change after the first load; manual ↻ Regenerate button; OpenAI primary, Gemini fallback |
+
+### Key metric corrections vs. original code
+
+| Metric | Correction |
+|---|---|
+| ASP | `SUM(sales_exc_tax) / COUNT(DISTINCT invoice_no)` — was dividing by row count |
+| Cash sales | `SUM(collected) WHERE payment_type = 'Cash' AND status = 'Closed'` — was missing |
+| Sales mix | Groups by `item_category` for % (was sub-category only) |
+| Rebook rate | `COUNT(rebooked=TRUE) / COUNT(status='Closed')` — was dividing by total |
+| Utilization join | `serviced_by = employee_name AND date AND center_name` — was missing date + center |
+| `start_time` in BigQuery | `EXTRACT(HOUR FROM start_time)` — column is `TIME`, not `TIMESTAMP` |
+
+---
 
 ## Local Development
 
@@ -49,13 +80,17 @@ evolve_spa_dashboard/
 ```bash
 cd backend
 python -m venv .venv
+
+# Windows
 .\.venv\Scripts\Activate.ps1
+
+# macOS / Linux
+source .venv/bin/activate
+
 pip install -r requirements.txt
 ```
 
-Create a local env file in `backend/` (for example `.env`) with the variables below.
-
-Run the backend:
+Create `backend/.env` (see Environment Variables below), then:
 
 ```bash
 uvicorn main:app --reload --port 8000
@@ -69,66 +104,150 @@ npm install
 npm start
 ```
 
-The frontend expects `REACT_APP_API_URL` to point to the backend, for example `http://localhost:8000`.
+Set `REACT_APP_API_URL=http://localhost:8000` in `frontend/.env` or `frontend/.env.local`.
+
+---
 
 ## Backend Environment Variables
-
-The backend reads credentials and BigQuery settings from environment variables.
 
 | Variable | Required | Description |
 |---|---|---|
 | `BIGQUERY_PROJECT_ID` | ✅ | GCP project ID |
 | `BIGQUERY_DATASET` | ✅ | BigQuery dataset name |
-| `BIGQUERY_TABLE` | ✅ | Default table name is `sales_accrual` |
-| `BIGQUERY_APPT_TABLE` | ✅ | Appointment table used by `appointments` API |
-| `GOOGLE_APPLICATION_CREDENTIALS` | ✅ local | Path to your BigQuery service account JSON file |
-| `BIGQUERY_CREDENTIALS_BASE64` | ✅ deployment | Base64-encoded JSON service account content |
-| `MONTHLY_GOAL` | optional | Numeric revenue goal for dashboard progress |
-| `PORT` | optional | Backend port, defaults to `8000` |
+| `BIGQUERY_TABLE` | ✅ | Sales accrual table (default: `sales_accrual`) |
+| `BIGQUERY_APPT_TABLE` | ✅ | Appointments table |
+| `BIGQUERY_SCHEDULE_TABLE` | ✅ | Employee schedule table (default: `employee_schedule`) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | ✅ local | Path to service account JSON |
+| `BIGQUERY_CREDENTIALS_BASE64` | ✅ deploy | Base64-encoded service account JSON |
+| `MONTHLY_GOAL` | optional | Numeric revenue goal (e.g. `150000`) |
+| `OPENAI_API_KEY` | optional | Primary AI provider for insights |
+| `GEMINI_API_KEY` | optional | Fallback AI provider for insights |
+| `AI_INSIGHTS_DEBUG` | optional | Set to `0` to silence insights debug logs (default `1`) |
+| `PORT` | optional | Backend port (default `8000`) |
 
-> ⚠️ Do not commit service account keys or `.env` files to version control.
+> ⚠️ Never commit `.env`, `bigquery_service_account.json`, or any key files.
 
-## API Endpoints
+---
+
+## API Reference
 
 ### Health
-- `GET /health`
+```
+GET /health
+→ { status, timestamp }
+```
 
-### Center data
-- `GET /api/centers` — revenue center list
-- `GET /api/appointment_centers` — appointment center list
+### Centers
+```
+GET /api/centers               → { centers: [string] }
+GET /api/appointment_centers   → { centers: [string] }
+```
 
-### Revenue APIs
-- `POST /api/revenue`
-  - body: `{ action, month, center }`
-  - supported actions: `summary`, `daily`, `categories`, `weekly`
-- `POST /api/dashboard` — alias for `/api/revenue`
+### Revenue — `POST /api/revenue`
+Body: `{ action, month, center }`
 
-### Leaderboard APIs
-- `POST /api/leaderboard`
-  - body: `{ action, month, center }`
-  - supported actions: `staff`, `service_types`, `referrals`, `staff_trend`
+| action | Returns |
+|---|---|
+| `summary` | `{ mtd_revenue, projected, rev_per_day, rev_per_hour, adv, yesterday_revenue, asp, invoice_count, cash_sales, goal, days_elapsed, days_in_month }` |
+| `daily` | `{ data: [{date, daily_revenue, mtd_cumulative, goal_mtd}], goal }` |
+| `categories` | `{ total, categories: [{category, revenue, percentage, invoice_count}], breakdown }` |
+| `weekly` | `{ weeks: [{week, revenue, wow}], full_month_pace }` |
+| `asp` | `{ data: [{month, revenue, invoices, asp}] }` |
+| `cash_sales` | `{ total_cash, data: [{date, cash_collected, cash_invoices}] }` |
 
-### Appointment APIs
-- `POST /api/appointments`
-  - body: `{ action, month, center }`
-  - supported actions: `summary`, `daily`, `by_status`, `by_category`, `by_provider`, `by_booking_source`, `by_hour`, `rebook_rate`
+`POST /api/dashboard` — legacy alias for `/api/revenue`.
 
-## Deployment Notes
+### Leaderboard — `POST /api/leaderboard`
+Body: `{ action, month, center }`
 
-- `backend/Procfile` is configured for a Python FastAPI deploy.
-- `frontend/package.json` includes `start`, `build`, and `serve` scripts.
-- For cloud deployment, set credentials using `BIGQUERY_CREDENTIALS_BASE64` instead of a local JSON file.
+| action | Returns |
+|---|---|
+| `staff` | `{ data: [{rank, staff, revenue, share, invoice_count, units_sold, asp}], total }` |
+| `service_types` | `{ data: [{servicer, revenue, invoices, asp, share}], total }` |
+| `referrals` | `{ data: [{source, count, revenue, share}], total }` |
+| `staff_trend` | `{ data: [{staff, trend: [{date, revenue}]}] }` |
+
+### Appointments — `POST /api/appointments`
+Body: `{ action, month, center }`
+
+| action | Returns |
+|---|---|
+| `summary` | Full KPIs incl. `rebook_rate` (rebooked ÷ closed), `first_visit_rate`, `addons`, `utilisation_pct` |
+| `rebook_rate` | Same data as summary — avoids a second query |
+| `daily` | `{ data: [{date, count, cumulative}] }` |
+| `by_status` | `{ data: [{status, count, pct}] }` |
+| `by_category` | `{ data: [{category, count, pct}] }` (Closed only) |
+| `by_provider` | `{ data: [{provider, count, closed_count, rebooked_count, rebook_rate, pct}] }` |
+| `by_booking_source` | `{ data: [{source, count, pct}] }` |
+| `by_hour` | `{ data: [{hour, count}] }` (Closed only) |
+| `weekly` | `{ weeks: [{week, total, closed, noshows, cancelled, wow}] }` |
+
+### Utilization — `POST /api/utilization`
+Body: `{ action, month, center }`
+
+| action | Returns |
+|---|---|
+| `provider_utilization` | `{ data: [{employee, role, center, scheduled_hours, booked_hours, utilization_pct}] }` |
+| `revenue_per_hour` | `{ data: [{employee, role, center, booked_hours, scheduled_hours, revenue, rev_per_hour, utilization_pct}] }` — joined on `serviced_by + date + center_name` |
+| `role_summary` | `{ data: [{role, headcount, scheduled_hours, booked_hours, revenue, utilization_pct, rev_per_hour}] }` |
+| `daily_utilization` | `{ data: [{date, center, scheduled_hours, booked_hours, utilization_pct}] }` |
+
+### AI Insights — `POST /api/insights`
+Body: `{ tab, prompt, month, center }`  
+Returns: `{ insight: string, provider: "openai" | "gemini" }`
+
+The frontend (`AiInsights.jsx`) builds the full grounded prompt from dashboard data and sends it here. The backend calls OpenAI first, falls back to Gemini if OpenAI is unavailable or fails.
+
+---
+
+## AI Insights — Data Flow
+
+```
+Panel (e.g. Revenue.jsx)
+  └─ onData({ summary, daily, categories, weekly }, false)
+       └─ App.js panelData state
+            └─ AiInsights({ tab, data: panelData, loading, month, center })
+                 └─ buildRevenuePrompt(data, month, center)
+                      └─ POST /api/insights → OpenAI / Gemini
+```
+
+**Key data keys per tab** (must match `onData` shape in each component):
+
+| Tab | onData keys |
+|---|---|
+| Revenue | `summary`, `daily`, `categories` (full obj), `weekly` |
+| Leaderboard | `staff`, `serviceTypes`, `referrals` |
+| Appointments | `summary`, `byStatus`, `byCategory`, `byProvider`, `byBookingSource` |
+| Utilization | `providers`, `revPerHour`, `roleSummary` |
+
+---
+
+## Deployment
+
+### Backend (Railway / Render / Fly.io)
+- Set all env vars in the platform dashboard
+- Use `BIGQUERY_CREDENTIALS_BASE64` instead of a file path
+- `Procfile`: `web: uvicorn main:app --host 0.0.0.0 --port $PORT`
+
+### Frontend
+- Set `REACT_APP_API_URL` to your deployed backend URL
+- Build: `npm run build`
+- Serve the `build/` folder from any static host (Vercel, Netlify, Railway static)
+
+---
 
 ## Quick Start
 
-1. Configure backend env vars.
-2. Start the backend on `http://localhost:8000`.
-3. Set `REACT_APP_API_URL=http://localhost:8000` in frontend environment.
-4. Start the frontend with `npm start`.
+```bash
+# 1. Configure backend env vars
+cp backend/.env.example backend/.env
+# edit backend/.env with your credentials
 
-## Useful Commands
+# 2. Start backend
+cd backend && uvicorn main:app --reload --port 8000
 
-- Backend install: `pip install -r backend/requirements.txt`
-- Backend run: `uvicorn backend.main:app --reload --port 8000`
-- Frontend install: `cd frontend && npm install`
-- Frontend run: `cd frontend && npm start`
+# 3. Start frontend
+cd frontend
+echo "REACT_APP_API_URL=http://localhost:8000" > .env.local
+npm install && npm start
+```

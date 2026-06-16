@@ -47,7 +47,7 @@ function AnimNum({ value }) {
   );
 }
 
-function KpiCard({ label, value, subLabel, subValue, highlight }) {
+function KpiCard({ label, value, subLabel, subValue, highlight, note }) {
   return (
     <div className={`kpi-card${highlight ? " kpi-card--highlight" : ""}`}>
       <div className="kpi-label">{label}</div>
@@ -58,6 +58,7 @@ function KpiCard({ label, value, subLabel, subValue, highlight }) {
           <AnimNum value={subValue ?? 0} />
         </div>
       )}
+      {note && <div className="kpi-note">{note}</div>}
     </div>
   );
 }
@@ -122,24 +123,26 @@ function RevenueChart({ data }) {
   );
 }
 
-function CategoryChart({ data }) {
-  if (!data?.length) return <div className="chart-empty">No category data</div>;
+// UPDATED: consumes new API shape — { categories: [...], breakdown: [...], total }
+// Primary donut uses item_category sales mix
+function CategoryChart({ categories, total }) {
+  if (!categories?.length) return <div className="chart-empty">No category data</div>;
   return (
     <div className="chart-card category-card">
-      <div className="chart-title">Revenue by item category</div>
+      <div className="chart-title">Sales mix by item category</div>
       <ResponsiveContainer width="100%" height={190}>
         <PieChart>
-          <Pie data={data} cx="50%" cy="50%" innerRadius={52} outerRadius={82}
+          <Pie data={categories} cx="50%" cy="50%" innerRadius={52} outerRadius={82}
                dataKey="revenue" nameKey="category" paddingAngle={2}>
-            {data.map((entry, i) => (
+            {categories.map((entry, i) => (
               <Cell key={entry.category} fill={DONUT_COLORS[i % DONUT_COLORS.length]}/>
             ))}
           </Pie>
-          <Tooltip formatter={(v,n,p) => [fmt(v,true), p.payload.category]}/>
+          <Tooltip formatter={(v, n, p) => [fmt(v, true), p.payload.category]}/>
         </PieChart>
       </ResponsiveContainer>
       <div className="cat-legend">
-        {data.map((d, i) => (
+        {categories.map((d, i) => (
           <div key={d.category} className="cat-legend-item">
             <span className="cat-dot" style={{background:DONUT_COLORS[i%DONUT_COLORS.length]}}/>
             <span className="cat-name">{d.category}</span>
@@ -147,6 +150,11 @@ function CategoryChart({ data }) {
           </div>
         ))}
       </div>
+      {total > 0 && (
+        <div style={{textAlign:"center",fontSize:10,color:"var(--text-muted)",marginTop:6}}>
+          Total: {fmt(total, true)}
+        </div>
+      )}
     </div>
   );
 }
@@ -180,12 +188,13 @@ function Skeleton({ h="18px", w="100%", mb="0" }) {
   return <div style={{height:h,width:w,borderRadius:4,background:"var(--skeleton)",marginBottom:mb,animation:"pulse 1.4s ease infinite"}}/>;
 }
 
-export default function Revenue({ apiBase, month, center }) {
+export default function Revenue({ apiBase, month, center, onData, aiInsights }) {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
   const [summary,  setSummary]  = useState(null);
   const [daily,    setDaily]    = useState([]);
-  const [cats,     setCats]     = useState([]);
+  // UPDATED: store full categories response object (has .categories, .breakdown, .total)
+  const [catsData, setCatsData] = useState(null);
   const [weekly,   setWeekly]   = useState(null);
   const [loaded,   setLoaded]   = useState(false);
 
@@ -202,10 +211,16 @@ export default function Revenue({ apiBase, month, center }) {
         post("summary"), post("daily"), post("categories"), post("weekly"),
       ]);
       if (s.error) throw new Error(s.error);
-      setSummary(s); setDaily(d.data||[]); setCats(c.data||[]); setWeekly(w);
+      setSummary(s);
+      setDaily(d.data || []);
+      // New API returns { categories, breakdown, total } — store the whole object
+      setCatsData(c);
+      setWeekly(w);
       setLoaded(true);
+      onData?.({ summary: s, daily: d.data || [], categories: c, weekly: w }, false);
     } catch(e) {
       setError(e.message || "Failed to load data");
+      onData?.({}, false);
     } finally {
       setLoading(false);
     }
@@ -217,9 +232,10 @@ export default function Revenue({ apiBase, month, center }) {
     <div className="dash-content">
       {error && <div className="error-bar">⚠ {error}</div>}
 
+      {/* ── KPI Row ── */}
       {loading ? (
         <div className="loading-row">
-          {[100,90,80,70,60].map((w,i)=>(
+          {[100,90,80,70,60,55,50].map((w,i)=>(
             <div key={i} className="kpi-card">
               <Skeleton h="10px" w="60%" mb="8px"/><Skeleton h="24px" w={`${w}%`}/>
             </div>
@@ -228,6 +244,7 @@ export default function Revenue({ apiBase, month, center }) {
       ) : loaded ? (
         <>
           {summary?.goal > 0 && <GoalBar mtd={summary.mtd_revenue} goal={summary.goal}/>}
+          {/* Row 1: Revenue KPIs */}
           <div className="kpi-row">
             <KpiCard label="MTD Revenue"  value={summary?.mtd_revenue}  subLabel="Yest:" subValue={summary?.yesterday_revenue} highlight/>
             <KpiCard label="Projected"    value={summary?.projected}/>
@@ -235,9 +252,44 @@ export default function Revenue({ apiBase, month, center }) {
             <KpiCard label="Rev / Hour"   value={summary?.rev_per_hour}/>
             <KpiCard label="30-Day ADV"   value={summary?.adv}/>
           </div>
+          {/* Row 2: NEW — ASP + Cash sales */}
+          <div className="kpi-row" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+            <KpiCard
+              label="Avg. Selling Price (ASP)"
+              value={summary?.asp}
+              note={`${summary?.invoice_count ?? 0} invoices`}
+              highlight
+            />
+            <KpiCard
+              label="Cash Sales MTD"
+              value={summary?.cash_sales}
+              note="payment_type = Cash"
+            />
+            <div className="kpi-card" style={{display:"flex",flexDirection:"column",justifyContent:"center"}}>
+              <div className="kpi-label">Cash vs Total</div>
+              <div style={{fontSize:22,fontWeight:700,color:"var(--text)"}}>
+                {summary?.mtd_revenue > 0
+                  ? ((summary.cash_sales / summary.mtd_revenue) * 100).toFixed(1) + "%"
+                  : "—"}
+              </div>
+              <div style={{marginTop:6,height:6,background:"var(--grid)",borderRadius:3}}>
+                <div style={{
+                  height:6, borderRadius:3, background:"var(--accent-bar)",
+                  width: summary?.mtd_revenue > 0
+                    ? `${Math.min((summary.cash_sales/summary.mtd_revenue)*100,100)}%`
+                    : "0%",
+                  transition:"width .8s ease"
+                }}/>
+              </div>
+            </div>
+          </div>
         </>
       ) : null}
 
+      {/* ── AI Insights ── */}
+      {loaded && aiInsights && aiInsights()}
+
+      {/* ── Charts Row ── */}
       {loading ? (
         <div className="loading-chart-row">
           <div className="chart-card"><Skeleton h="260px"/></div>
@@ -246,10 +298,15 @@ export default function Revenue({ apiBase, month, center }) {
       ) : loaded ? (
         <div className="charts-row">
           <RevenueChart data={daily}/>
-          <CategoryChart data={cats}/>
+          {/* UPDATED: pass categories array + total from new response shape */}
+          <CategoryChart
+            categories={catsData?.categories || []}
+            total={catsData?.total || 0}
+          />
         </div>
       ) : null}
 
+      {/* ── Weekly Table ── */}
       {loading ? (
         <div className="weekly-card" style={{padding:16}}><Skeleton h="140px"/></div>
       ) : loaded ? (

@@ -26,6 +26,7 @@ function MiniBar({ value, max }) {
   );
 }
 
+// UPDATED: label changed from avg_ticket → asp (SUM(rev)/COUNT(DISTINCT invoice_no))
 function StaffLeaderboard({ data }) {
   if (!data?.length) return <div className="chart-empty">No staff data</div>;
   const maxRev = data[0]?.revenue || 0;
@@ -45,7 +46,10 @@ function StaffLeaderboard({ data }) {
             </div>
             <div className="lb-stats">
               <div className="lb-rev">{fmt(s.revenue, true)}</div>
-              <div className="lb-meta">{s.share}% · {s.invoice_count} inv · {fmt(s.avg_ticket,true)}/avg</div>
+              {/* UPDATED: asp = SUM(sales_exc_tax) / COUNT(DISTINCT invoice_no) */}
+              <div className="lb-meta">
+                {s.share}% · {s.invoice_count} inv · ASP {fmt(s.asp, true)}
+              </div>
             </div>
           </div>
         ))}
@@ -56,12 +60,12 @@ function StaffLeaderboard({ data }) {
 
 function TopStaffChart({ data }) {
   if (!data?.length) return null;
-  const top5 = data.slice(0, 8);
+  const top8 = data.slice(0, 8);
   return (
     <div className="chart-card">
       <div className="chart-title">Revenue by staff — top 8</div>
       <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={top5} layout="vertical" margin={{top:4,right:60,left:0,bottom:0}}>
+        <BarChart data={top8} layout="vertical" margin={{top:4,right:60,left:0,bottom:0}}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--grid)" horizontal={false}/>
           <XAxis type="number" tickFormatter={v=>`$${(v/1000).toFixed(0)}K`}
                  tick={{fontSize:9,fill:"var(--text-muted)"}} tickLine={false} axisLine={false}/>
@@ -69,7 +73,7 @@ function TopStaffChart({ data }) {
                  tick={{fontSize:10,fill:"var(--text-muted)"}} tickLine={false} axisLine={false}/>
           <Tooltip formatter={v=>[fmt(v,true),"Revenue"]}/>
           <Bar dataKey="revenue" radius={[0,3,3,0]} maxBarSize={14}>
-            {top5.map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]}/>)}
+            {top8.map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]}/>)}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -77,19 +81,32 @@ function TopStaffChart({ data }) {
   );
 }
 
+// UPDATED: added ASP column — SUM(sales_exc_tax) / COUNT(DISTINCT invoice_no)
 function ServicerTable({ data }) {
   if (!data?.length) return <div className="chart-empty">No servicer data</div>;
   return (
     <div className="weekly-card">
-      <div style={{padding:"10px 16px 6px",fontSize:11,color:"var(--text-muted)",fontStyle:"italic"}}>Revenue by servicer</div>
+      <div style={{padding:"10px 16px 6px",fontSize:11,color:"var(--text-muted)",fontStyle:"italic"}}>
+        Revenue by servicer
+      </div>
       <table className="weekly-table">
-        <thead><tr><th>Servicer</th><th>Revenue</th><th>Invoices</th><th>Share</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Servicer</th>
+            <th>Revenue</th>
+            <th>Invoices</th>
+            {/* UPDATED: ASP = revenue / distinct invoices */}
+            <th>ASP</th>
+            <th>Share</th>
+          </tr>
+        </thead>
         <tbody>
           {data.map(r => (
             <tr key={r.servicer}>
               <td>{r.servicer}</td>
-              <td style={{textAlign:"right"}}>{fmt(r.revenue,true)}</td>
+              <td style={{textAlign:"right"}}>{fmt(r.revenue, true)}</td>
               <td style={{textAlign:"right"}}>{r.invoices}</td>
+              <td style={{textAlign:"right"}}>{fmt(r.asp, true)}</td>
               <td style={{textAlign:"right"}}>{r.share}%</td>
             </tr>
           ))}
@@ -121,7 +138,7 @@ function ReferralTable({ data }) {
   );
 }
 
-export default function Leaderboard({ apiBase, month, center }) {
+export default function Leaderboard({ apiBase, month, center, onData, aiInsights }) {
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState("");
   const [staff,     setStaff]     = useState([]);
@@ -146,12 +163,14 @@ export default function Leaderboard({ apiBase, month, center }) {
         post("referrals"),
       ]);
       if (s.error) throw new Error(s.error);
-      setStaff(s.data||[]);
-      setServicers(sv.data||[]);
-      setReferrals(ref.data||[]);
+      setStaff(s.data || []);
+      setServicers(sv.data || []);
+      setReferrals(ref.data || []);
       setLoaded(true);
+      onData?.({ staff: s, serviceTypes: sv, referrals: ref }, false);
     } catch(e) {
       setError(e.message || "Failed to load data");
+      onData?.({}, false);
     } finally {
       setLoading(false);
     }
@@ -173,6 +192,7 @@ export default function Leaderboard({ apiBase, month, center }) {
         </>
       ) : loaded ? (
         <>
+          {aiInsights && aiInsights()}
           <div className="charts-row" style={{gridTemplateColumns:"1fr 340px"}}>
             <StaffLeaderboard data={staff}/>
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -180,6 +200,7 @@ export default function Leaderboard({ apiBase, month, center }) {
               <ReferralTable data={referrals}/>
             </div>
           </div>
+          {/* UPDATED: ServicerTable now shows ASP column */}
           <ServicerTable data={servicers}/>
         </>
       ) : null}

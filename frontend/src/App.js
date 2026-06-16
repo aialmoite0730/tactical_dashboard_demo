@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import "./App.css";
 import Revenue      from "./components/Revenue";
 import Leaderboard  from "./components/Leaderboard";
 import Appointments from "./components/Appointments";
+import Utilization  from "./components/Utilization";
+import AiInsights   from "./components/AiInsights";
 
 // ─── Config ────────────────────────────────────────────────
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000";
@@ -11,6 +14,7 @@ const TABS = [
   { id: "revenue",      label: "📈 Revenue"      },
   { id: "leaderboard",  label: "🏆 Leaderboard"  },
   { id: "appointments", label: "📅 Appointments" },
+  { id: "utilization",  label: "⏱ Utilization"  },
 ];
 
 function monthStr(monthName, year) {
@@ -34,11 +38,31 @@ export default function App() {
 
   // Refresh trigger
   const [refreshKey,    setRefreshKey]    = useState(0);
-  
-  // Derived values
-  const month = monthStr(selectedMonth, selectedYear);
+
+  // Derived values — must be before any hook that references them
+  const month         = monthStr(selectedMonth, selectedYear);
   const activeCenters = tab === "appointments" ? apptCenters : centers;
 
+  // AI Insights — panels report their fetched data + loading state upward
+  const [panelData,    setPanelData]    = useState({});
+  const [panelLoading, setPanelLoading] = useState(true);
+
+  const handlePanelData = useCallback((d, l) => {
+    setPanelData(d);
+    setPanelLoading(l);
+  }, []);
+
+  // Render-prop: called fresh each render so always reads current state.
+  const renderAiInsights = useCallback((tabId) => (
+    <AiInsights
+      tab={tabId}
+      data={panelData}
+      loading={panelLoading}
+      month={month}
+      center={center}
+    />
+  ), [month, center, panelData, panelLoading]);
+  
   // 1. Load BOTH center lists once on mount
   useEffect(() => {
     let loadedCount = 0;
@@ -60,179 +84,21 @@ export default function App() {
 
   // 2. Auto-reset center to "All" if switching tabs makes the current center invalid
   useEffect(() => {
-    if (!centersLoaded) return; // Wait until lists are loaded
+    if (!centersLoaded) return;
     if (center !== "All" && !activeCenters.includes(center)) {
       setCenter("All");
       setRefreshKey(k => k + 1);
     }
   }, [tab, activeCenters, center, centersLoaded]);
 
+  // 3. Clear stale panel data whenever the active view changes
+  useEffect(() => {
+    setPanelData({});
+    setPanelLoading(true);
+  }, [tab, month, center]);
+
   return (
     <>
-      <style>{`
-        :root {
-          --bg:          #f5f0e8;
-          --surface:     #faf7f2;
-          --surface-2:   #ffffff;
-          --border:      #e2d9cc;
-          --text:        #1a1410;
-          --text-muted:  #8a7a6a;
-          --accent-bar:  #7a5c3e;
-          --accent-line: #3d2b1f;
-          --accent-goal: #b89a6a;
-          --grid:        #ede6da;
-          --wow-pos:     #2d6a4f;
-          --wow-neg:     #9b1c1c;
-          --skeleton:    #e8e0d4;
-          --radius:      10px;
-          --shadow:      0 1px 4px rgba(0,0,0,0.07);
-        }
-        *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-        html, body {
-          height:100%; font-family:"Georgia","Times New Roman",serif;
-          background:var(--bg); color:var(--text); font-size:14px;
-          -webkit-font-smoothing:antialiased;
-        }
-        /* ── Header ── */
-        .header {
-          display:flex; align-items:center; justify-content:space-between;
-          padding:0 24px; height:52px; background:var(--surface-2);
-          border-bottom:1px solid var(--border); position:sticky; top:0; z-index:50;
-          box-shadow:var(--shadow);
-        }
-        .header-brand { font-size:13px; font-weight:700; letter-spacing:0.04em; }
-        .header-right  { display:flex; align-items:center; gap:8px; }
-        .hdr-select {
-          font-family:inherit; font-size:12px; padding:5px 10px;
-          border:1px solid var(--border); border-radius:6px;
-          background:var(--surface); color:var(--text); cursor:pointer;
-        }
-        .hdr-select:focus { outline:none; border-color:#a0845c; }
-        .hdr-divider { width:1px; height:24px; background:var(--border); margin:0 4px; }
-
-        /* ── Tab bar ── */
-        .tabbar {
-          display:flex; align-items:center; gap:2px;
-          padding:0 24px; background:var(--surface-2);
-          border-bottom:1px solid var(--border);
-          position:sticky; top:52px; z-index:40;
-        }
-        .tab-btn {
-          font-family:inherit; font-size:12px; padding:10px 18px;
-          border:none; background:none; color:var(--text-muted);
-          cursor:pointer; border-bottom:2px solid transparent;
-          transition:all 0.15s; letter-spacing:0.02em; white-space:nowrap;
-        }
-        .tab-btn:hover { color:var(--text); }
-        .tab-btn.active { color:var(--accent-line); border-bottom-color:var(--accent-line); font-weight:700; }
-
-        /* ── Context bar ── */
-        .context-bar {
-          display:flex; align-items:center; gap:8px; padding:7px 24px;
-          background:var(--surface); border-bottom:1px solid var(--border);
-          font-size:11px; color:var(--text-muted);
-        }
-        .ctx-chip {
-          background:var(--surface-2); border:1px solid var(--border);
-          border-radius:20px; padding:2px 10px; font-size:11px; color:var(--text);
-        }
-
-        /* ── Dashboard layout ── */
-        .dash-content { padding:18px 24px; display:flex; flex-direction:column; gap:14px; }
-
-        /* ── KPI Row ── */
-        .kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
-        .kpi-card {
-          background:var(--surface-2); border:1px solid var(--border);
-          border-radius:var(--radius); padding:12px 16px; box-shadow:var(--shadow);
-          transition:box-shadow 0.15s;
-        }
-        .kpi-card--highlight { border-color:var(--accent-bar); }
-        .kpi-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.07em; margin-bottom:5px; }
-        .kpi-value { font-size:20px; font-weight:700; color:var(--text); line-height:1; letter-spacing:-0.01em; }
-        .kpi-sub   { margin-top:5px; font-size:10px; color:var(--text-muted); display:flex; gap:4px; align-items:center; }
-
-        /* ── Goal bar ── */
-        .goal-bar-wrap { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 16px; box-shadow:var(--shadow); }
-        .goal-bar-header { display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-bottom:8px; }
-        .goal-bar-track { background:var(--grid); border-radius:4px; height:8px; }
-        .goal-bar-fill  { background:var(--accent-bar); border-radius:4px; height:8px; transition:width 0.8s ease; }
-
-        /* ── Charts ── */
-        .charts-row { display:grid; grid-template-columns:1fr 360px; gap:12px; }
-        .loading-chart-row { display:grid; grid-template-columns:1fr 360px; gap:12px; }
-        .loading-row  { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
-        .chart-card {
-          background:var(--surface-2); border:1px solid var(--border);
-          border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow);
-        }
-        .chart-title { font-size:11px; color:var(--text-muted); font-style:italic; margin-bottom:8px; }
-        .chart-empty { color:var(--text-muted); font-size:12px; padding:40px; text-align:center; }
-        .chart-legend-row { display:flex; gap:14px; margin-bottom:6px; font-size:10px; color:var(--text-muted); }
-
-        /* ── Category chart ── */
-        .category-card { display:flex; flex-direction:column; }
-        .cat-legend { display:grid; grid-template-columns:1fr 1fr; gap:3px 10px; margin-top:6px; }
-        .cat-legend-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--text-muted); }
-        .cat-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-        .cat-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .cat-pct  { font-weight:700; color:var(--text); }
-
-        /* ── Weekly table ── */
-        .weekly-card { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); }
-        .weekly-table { width:100%; border-collapse:collapse; font-size:13px; }
-        .weekly-table th { padding:9px 20px; text-align:left; font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; border-bottom:1px solid var(--border); }
-        .weekly-table th:not(:first-child), .weekly-table td:not(:first-child) { text-align:right; }
-        .weekly-table td { padding:9px 20px; border-bottom:1px solid var(--grid); }
-        .weekly-table tr:last-child td { border-bottom:none; }
-        .wow-pos { color:var(--wow-pos); font-weight:700; }
-        .wow-neg { color:var(--wow-neg); font-weight:700; }
-        .pace-row td { font-weight:700; background:var(--bg); }
-
-        /* ── Leaderboard ── */
-        .leaderboard-list { display:flex; flex-direction:column; gap:4px; max-height:420px; overflow-y:auto; }
-        .lb-row {
-          display:flex; align-items:center; gap:10px;
-          padding:7px 10px; border-radius:6px; transition:background 0.1s;
-        }
-        .lb-row:hover { background:var(--bg); }
-        .lb-row--top  { background:linear-gradient(90deg, rgba(196,168,130,0.08), transparent); }
-        .lb-rank      { font-size:18px; width:28px; text-align:center; flex-shrink:0; }
-        .lb-num       { font-size:12px; color:var(--text-muted); font-weight:700; }
-        .lb-info      { flex:1; min-width:0; }
-        .lb-name      { font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .lb-stats     { text-align:right; flex-shrink:0; }
-        .lb-rev       { font-size:14px; font-weight:700; }
-        .lb-meta      { font-size:10px; color:var(--text-muted); }
-
-        /* ── Tooltip ── */
-        .chart-tooltip {
-          background:var(--surface-2); border:1px solid var(--border);
-          border-radius:6px; padding:8px 12px; font-size:11px;
-          box-shadow:0 4px 12px rgba(0,0,0,0.1);
-        }
-        .tooltip-date { font-weight:700; margin-bottom:3px; }
-        .tooltip-row  { display:flex; justify-content:space-between; gap:12px; }
-
-        /* ── Error ── */
-        .error-bar {
-          background:#fef2f2; border:1px solid #fca5a5; color:#991b1b;
-          padding:10px 20px; font-size:12px; border-radius:8px;
-        }
-
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
-
-        /* ── Responsive ── */
-        @media (max-width:1100px) { .charts-row,.loading-chart-row { grid-template-columns:1fr; } }
-        @media (max-width:800px)  {
-          .kpi-row,.loading-row { grid-template-columns:repeat(2,1fr); }
-          .dash-content { padding:12px 14px; }
-          .header { padding:0 14px; }
-          .tabbar { padding:0 14px; overflow-x:auto; }
-          .context-bar { padding:6px 14px; }
-        }
-        @media (max-width:500px)  { .kpi-row,.loading-row { grid-template-columns:1fr; } }
-      `}</style>
 
       {/* ── Header ── */}
       <header className="header">
@@ -253,6 +119,14 @@ export default function App() {
                   onChange={e => { setSelectedMonth(e.target.value); setRefreshKey(k => k + 1); }}>
             {MONTHS.map(m => <option key={m}>{m}</option>)}
           </select>
+          {panelLoading && (
+            <span className="hdr-loading">
+              <span className="ai-pulse" style={{fontSize:8}}>●</span>
+              <span className="ai-pulse" style={{fontSize:8,animationDelay:"0.2s"}}>●</span>
+              <span className="ai-pulse" style={{fontSize:8,animationDelay:"0.4s"}}>●</span>
+              Loading data…
+            </span>
+          )}
         </div>
       </header>
 
@@ -273,10 +147,11 @@ export default function App() {
         <span className="ctx-chip">{selectedMonth} {selectedYear}</span>
       </div>
 
-      {/* ── Dashboard panels ── */}
-      {tab === "revenue"      && <Revenue      key={`rev-${refreshKey}`}  apiBase={API_BASE} month={month} center={center} />}
-      {tab === "leaderboard"  && <Leaderboard  key={`lb-${refreshKey}`}   apiBase={API_BASE} month={month} center={center} />}
-      {tab === "appointments" && <Appointments key={`appt-${refreshKey}`} apiBase={API_BASE} month={month} center={center} />}
+      {/* ── Dashboard panels ── onData bubbles data up; aiInsights is a render-prop ── */}
+      {tab === "revenue"      && <Revenue      key={`rev-${refreshKey}`}  apiBase={API_BASE} month={month} center={center} onData={handlePanelData} aiInsights={() => renderAiInsights("revenue")}      />}
+      {tab === "leaderboard"  && <Leaderboard  key={`lb-${refreshKey}`}   apiBase={API_BASE} month={month} center={center} onData={handlePanelData} aiInsights={() => renderAiInsights("leaderboard")}  />}
+      {tab === "appointments" && <Appointments key={`appt-${refreshKey}`} apiBase={API_BASE} month={month} center={center} onData={handlePanelData} aiInsights={() => renderAiInsights("appointments")} />}
+      {tab === "utilization"  && <Utilization  key={`util-${refreshKey}`} apiBase={API_BASE} month={month} center={center} onData={handlePanelData} aiInsights={() => renderAiInsights("utilization")}  />}
     </>
   );
 }

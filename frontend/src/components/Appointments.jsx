@@ -18,7 +18,7 @@ const post = async (base, path, body) => {
   return res.json();
 };
 
-// ─── Confirmed status palette from sample data ────────────────────────────────
+// ─── Status palette (confirmed from schema) ───────────────────────────────────
 const STATUS_COLORS = {
   "Closed":           "#2d6a4f",
   "Closed (No Show)": "#9b1c1c",
@@ -30,23 +30,29 @@ const STATUS_COLORS = {
 const C = {
   bar:   "#7a5c3e",
   bar2:  "#b89a6a",
-  line:  "#3d2b1f",
   grid:  "#ede6da",
   muted: "#8a7a6a",
   DONUT: ["#3d2b1f","#7a5c3e","#b89a6a","#d4aa7d","#e8cfa8","#c9a96e","#8b6348","#a07850"],
 };
 
-// ─── Components ───────────────────────────────────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
 function Skeleton({ h = 20, w = "100%" }) {
-  return <div style={{ height: h, width: w, borderRadius: 6, background: "var(--skeleton)", animation: "pulse 1.4s ease-in-out infinite" }} />;
+  return (
+    <div style={{
+      height: h, width: w, borderRadius: 6,
+      background: "var(--skeleton)",
+      animation: "pulse 1.4s ease-in-out infinite",
+    }} />
+  );
 }
 
-function KpiCard({ label, value, sub, loading, highlight }) {
+function KpiCard({ label, value, sub, loading, highlight, note }) {
   return (
     <div className="kpi-card" style={highlight ? { borderColor: "var(--accent-bar)" } : {}}>
       <div className="kpi-label">{label}</div>
       {loading ? <Skeleton h={28} w="70%" /> : <div className="kpi-value">{value ?? "—"}</div>}
-      {sub && !loading && <div className="kpi-sub">{sub}</div>}
+      {sub  && !loading && <div className="kpi-sub">{sub}</div>}
+      {note && !loading && <div className="kpi-note">{note}</div>}
     </div>
   );
 }
@@ -74,23 +80,39 @@ function ChartTip({ active, payload, label }) {
   );
 }
 
-function HBar({ label, value, max, pctLabel, color = C.bar }) {
+function HBar({ label, value, max, pctLabel, color = C.bar, subLabel }) {
   const w = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
-        <span style={{ color: "var(--text)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "60%" }}>{label}</span>
-        <span style={{ color: "var(--text-muted)" }}>{fmtNum(value)}&nbsp;<span style={{ color }}>{pctLabel}</span></span>
+    <div style={{ marginBottom: 10 }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between",
+        fontSize: 11, marginBottom: 3,
+      }}>
+        <span style={{
+          color: "var(--text)", fontWeight: 600,
+          overflow: "hidden", textOverflow: "ellipsis",
+          whiteSpace: "nowrap", maxWidth: "55%",
+        }}>{label}</span>
+        <span style={{ color: "var(--text-muted)", textAlign: "right", fontSize: 10 }}>
+          {fmtNum(value)}&nbsp;
+          <span style={{ color }}>{pctLabel}</span>
+          {subLabel && <span style={{ marginLeft: 6, color: "var(--text-muted)" }}>{subLabel}</span>}
+        </span>
       </div>
       <div style={{ height: 6, background: "var(--grid)", borderRadius: 3 }}>
-        <div style={{ height: 6, width: w + "%", background: color, borderRadius: 3, transition: "width .6s ease" }} />
+        <div style={{
+          height: 6, width: w + "%", background: color,
+          borderRadius: 3, transition: "width .6s ease",
+        }} />
       </div>
     </div>
   );
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
-export default function Appointments({ apiBase, month, center }) {
+// ─── Main component ───────────────────────────────────────────────────────────
+// UPDATED: accepts onData (bubbles fetched data to App.js for AI insights)
+//          and aiInsights (render-prop that injects the AI panel)
+export default function Appointments({ apiBase, month, center, onData, aiInsights }) {
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
   const [summary,    setSummary]    = useState(null);
@@ -100,6 +122,10 @@ export default function Appointments({ apiBase, month, center }) {
   const [providers,  setProviders]  = useState([]);
   const [sources,    setSources]    = useState([]);
   const [hourly,     setHourly]     = useState([]);
+  // NOTE: summary already returns rebook_rate + first_visit_rate + addons in the
+  // merged backend query (appointments.py action="summary"). The separate
+  // rebook_rate fetch is kept here for components that reference rebookData
+  // directly, but the data is identical to summary fields.
   const [rebookData, setRebookData] = useState(null);
 
   const mkBody = useCallback(action => ({ action, month, center }), [month, center]);
@@ -118,12 +144,33 @@ export default function Appointments({ apiBase, month, center }) {
         post(apiBase, "/api/appointments", mkBody("rebook_rate")),
       ]);
       if (sum.error) throw new Error(sum.error);
-      setSummary(sum); setDaily(day.data || []); setStatuses(stat.data || []);
-      setCategories(cat.data || []); setProviders(prov.data || []);
-      setSources(src.data || []); setHourly(hr.data || []); setRebookData(rb);
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
-  }, [apiBase, mkBody]);
+      setSummary(sum);
+      setDaily(day.data || []);
+      setStatuses(stat.data || []);
+      setCategories(cat.data || []);
+      setProviders(prov.data || []);
+      setSources(src.data || []);
+      setHourly(hr.data || []);
+      setRebookData(rb);
+
+      // UPDATED: bubble all data needed by AiInsights buildAppointmentsPrompt
+      onData?.(
+        {
+          summary:         sum,
+          byStatus:        stat,
+          byCategory:      cat,
+          byProvider:      prov,
+          byBookingSource: src,
+        },
+        false
+      );
+    } catch (e) {
+      setError(e.message);
+      onData?.({}, false);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiBase, mkBody]); // eslint-disable-line
 
   useEffect(() => { load(); }, [load]);
 
@@ -134,7 +181,7 @@ export default function Appointments({ apiBase, month, center }) {
     <div className="dash-content">
       {error && <div className="error-bar">⚠ {error}</div>}
 
-      {/* ── KPI Row 1 ── */}
+      {/* ── KPI Row 1: Volume + Rates ── */}
       <div className="kpi-row">
         <KpiCard highlight loading={loading} label="Appointments MTD"
           value={summary ? fmtNum(summary.total_appointments) : null}
@@ -145,15 +192,18 @@ export default function Appointments({ apiBase, month, center }) {
         <KpiCard loading={loading} label="Cancellation Rate"
           value={summary ? summary.cancel_rate + "%" : null}
           sub={summary ? `${fmtNum(summary.cancelled)} cancelled` : null} />
+        {/* CORRECTED: rebook_rate = rebooked / closed (not / total) */}
         <KpiCard loading={loading} label="Rebook Rate"
           value={rebookData ? rebookData.rebook_rate + "%" : null}
-          sub={rebookData ? `${fmtNum(rebookData.rebooked)} rebooked` : null} />
+          sub={rebookData ? `${fmtNum(rebookData.rebooked)} of ${fmtNum(rebookData.closed)} closed` : null}
+          note="Rebooked ÷ Completed" />
         <KpiCard loading={loading} label="First-Visit Rate"
           value={rebookData ? rebookData.first_visit_rate + "%" : null}
-          sub={rebookData ? `${fmtNum(rebookData.first_visits)} new guests` : null} />
+          sub={rebookData ? `${fmtNum(rebookData.first_visits)} new guests` : null}
+          note="First visits ÷ Completed" />
       </div>
 
-      {/* ── KPI Row 2 ── */}
+      {/* ── KPI Row 2: Ops ── */}
       <div className="kpi-row">
         <KpiCard loading={loading} label="Avg. Appts / Day"
           value={summary ? summary.avg_per_day : null} />
@@ -161,13 +211,18 @@ export default function Appointments({ apiBase, month, center }) {
           value={summary ? fmtNum(summary.surprise_visits) : null} />
         <KpiCard loading={loading} label="Utilisation"
           value={summary ? summary.utilisation_pct + "%" : null}
-          sub="scheduled vs 10h capacity" />
+          note="Sched. min ÷ (days × 10h × 60)" />
         <KpiCard loading={loading} label="Avg. Duration"
-          value={summary ? summary.avg_actual_duration_min + " min" : null} />
+          value={summary?.avg_actual_duration_min != null
+            ? summary.avg_actual_duration_min + " min"
+            : null} />
         <KpiCard loading={loading} label="Add-ons"
           value={rebookData ? fmtNum(rebookData.addons) : null}
           sub="appts with add-on" />
       </div>
+
+      {/* ── AI Insights panel (injected by App.js render-prop) ── */}
+      {!loading && aiInsights && aiInsights()}
 
       {/* ── Daily trend + Status donut ── */}
       <div className="charts-row">
@@ -240,7 +295,7 @@ export default function Appointments({ apiBase, month, center }) {
             )}
         </SCard>
 
-        <SCard title="Appointment volume by hour (EST)">
+        <SCard title="Appointment volume by hour">
           {loading ? <Skeleton h={200} /> : hourly.length === 0
             ? <div className="chart-empty">No data</div>
             : (
@@ -249,7 +304,10 @@ export default function Appointments({ apiBase, month, center }) {
                   <CartesianGrid strokeDasharray="3 3" stroke={C.grid} vertical={false} />
                   <XAxis dataKey="hour" tick={{ fontSize: 9, fill: C.muted }} tickFormatter={h => h + ":00"} />
                   <YAxis tick={{ fontSize: 9, fill: C.muted }} />
-                  <Tooltip formatter={v => [fmtNum(v), "Appointments"]} labelFormatter={h => h + ":00 – " + (h+1) + ":00"} />
+                  <Tooltip
+                    formatter={v => [fmtNum(v), "Appointments"]}
+                    labelFormatter={h => `${h}:00 – ${h+1}:00`}
+                  />
                   <Bar dataKey="count" name="Appointments" fill={C.bar2} radius={[2,2,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -259,25 +317,39 @@ export default function Appointments({ apiBase, month, center }) {
 
       {/* ── Provider + Booking source ── */}
       <div className="charts-row">
+        {/* UPDATED: shows rebook_rate per provider from new API field */}
         <SCard title="Top providers by appointment count">
           {loading
-            ? [1,2,3,4,5].map(i => <div key={i} style={{marginBottom:10}}><Skeleton h={28}/></div>)
+            ? [1,2,3,4,5].map(i => <div key={i} style={{ marginBottom: 10 }}><Skeleton h={28} /></div>)
             : providers.length === 0
               ? <div className="chart-empty">No data</div>
               : providers.map(r => (
-                  <HBar key={r.provider} label={r.provider} value={r.count}
-                        max={maxProv} pctLabel={r.pct + "%"} color={C.bar} />
+                  <HBar
+                    key={r.provider}
+                    label={r.provider}
+                    value={r.count}
+                    max={maxProv}
+                    pctLabel={r.pct + "%"}
+                    color={C.bar}
+                    subLabel={`✓ ${fmtNum(r.closed_count)} · rebook ${r.rebook_rate}%`}
+                  />
                 ))}
         </SCard>
 
         <SCard title="Appointments by booking source">
           {loading
-            ? [1,2,3,4,5].map(i => <div key={i} style={{marginBottom:10}}><Skeleton h={28}/></div>)
+            ? [1,2,3,4,5].map(i => <div key={i} style={{ marginBottom: 10 }}><Skeleton h={28} /></div>)
             : sources.length === 0
               ? <div className="chart-empty">No data</div>
               : sources.map(r => (
-                  <HBar key={r.source} label={r.source} value={r.count}
-                        max={maxSrc} pctLabel={r.pct + "%"} color={C.bar2} />
+                  <HBar
+                    key={r.source}
+                    label={r.source}
+                    value={r.count}
+                    max={maxSrc}
+                    pctLabel={r.pct + "%"}
+                    color={C.bar2}
+                  />
                 ))}
         </SCard>
       </div>
@@ -316,7 +388,11 @@ function WeeklyTable({ apiBase, month, center }) {
         </thead>
         <tbody>
           {loading && (
-            <tr><td colSpan={6} style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)", fontSize: 12 }}>Loading…</td></tr>
+            <tr>
+              <td colSpan={6} style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)", fontSize: 12 }}>
+                Loading…
+              </td>
+            </tr>
           )}
           {!loading && rows.map(r => (
             <tr key={r.week}>
@@ -328,12 +404,18 @@ function WeeklyTable({ apiBase, month, center }) {
               <td>
                 {r.wow == null
                   ? <span style={{ color: "var(--text-muted)" }}>—</span>
-                  : <span className={r.wow >= 0 ? "wow-pos" : "wow-neg"}>{r.wow >= 0 ? "+" : ""}{r.wow}%</span>}
+                  : <span className={r.wow >= 0 ? "wow-pos" : "wow-neg"}>
+                      {r.wow >= 0 ? "+" : ""}{r.wow}%
+                    </span>}
               </td>
             </tr>
           ))}
           {!loading && rows.length === 0 && (
-            <tr><td colSpan={6} style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)", fontSize: 12 }}>No data</td></tr>
+            <tr>
+              <td colSpan={6} style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)", fontSize: 12 }}>
+                No data
+              </td>
+            </tr>
           )}
         </tbody>
       </table>
