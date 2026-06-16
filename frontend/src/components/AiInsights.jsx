@@ -22,33 +22,35 @@ function signedPct(n) {
   const v = Number(n);
   return (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
 }
-// "0" is a real reported value — never collapse it to "MISSING".
 function valOrMissing(n, formatter) {
   if (n == null || isNaN(Number(n))) return "MISSING";
   return formatter(n);
 }
 
-// ── Grounding rules injected into every prompt ─────────────────────────────────
+// ── Shared grounding rules ─────────────────────────────────────────────────────
 const GROUNDING_RULES =
-  `RULES:\n` +
-  `- Use ONLY the numbers provided. Do not invent, estimate, or assume any figure.\n` +
-  `- "MISSING" or "N/A" means the data point is unavailable — say so or skip it.\n` +
-  `- "0" or "0%" is a real result, not missing data.\n` +
-  `- Do not speculate about causes not stated in the data.\n` +
-  `- When citing an outlier, name it and quote the exact number.\n` +
-  `- Every recommendation must reference a specific metric cited earlier.\n` +
-  `- Plain business English. No bullet points, no markdown headers, no emojis.\n` +
+  `RULES FOR THIS ANALYSIS:\n` +
+  `- Only use the numbers given below. Do not invent, estimate, or assume any figure not explicitly provided.\n` +
+  `- "MISSING" or "N/A" means the data point is genuinely unavailable — say so plainly or skip it. Do not guess a value.\n` +
+  `- "0" or "0%" is a real, reported value — treat it as a true result, not as missing data.\n` +
+  `- Do not speculate about causes (weather, staffing changes, marketing, holidays) unless explicitly stated in the data.\n` +
+  `- When flagging an outlier, name the specific item and cite the specific number.\n` +
+  `- Recommendations must be tied to a specific number you cited earlier — no generic advice without a metric backing it.\n` +
+  `- Write in plain business English, short paragraphs, no bullet points, no markdown headers, no emojis.\n` +
   `- Max 120 words.\n`;
 
 // ── Prompt builders ────────────────────────────────────────────────────────────
 
-// ─ Revenue ───────────────────────────────────────────────────────────────────
-// data shape from Revenue.jsx onData:
-//   { summary, daily, categories (full obj: {total, categories, breakdown}), weekly }
+// Revenue — data: { summary, daily, categories, weekly }
+// summary shape: { mtd_revenue, cash_sales, goal, yesterday_revenue, projected,
+//                  rev_per_day, rev_per_hour, adv, asp, invoice_count,
+//                  days_elapsed, days_in_month }
+// categories shape: { total, categories:[{category,revenue,percentage,invoice_count}], breakdown }
+// weekly shape: { weeks:[{week,revenue,wow}], full_month_pace }
 function buildRevenuePrompt(data, month, center) {
-  const s   = data.summary   || {};
-  const w   = data.weekly    || {};
-  const cat = data.categories || {};  // { total, categories:[{category,revenue,percentage,invoice_count}], breakdown }
+  const s   = data.summary    || {};
+  const w   = data.weekly     || {};
+  const cat = data.categories || {};
 
   const goalPct = (s.mtd_revenue != null && s.goal && s.goal > 0)
     ? pct((s.mtd_revenue / s.goal) * 100)
@@ -74,7 +76,6 @@ function buildRevenuePrompt(data, month, center) {
       ).join("\n") + `\n  Full-Month Pace: ${currency(w.full_month_pace)}`
     : "  No weekly data.";
 
-  // FIXED: data.categories is the full response object {total, categories, breakdown}
   const catsBlock = (cat.categories || []).length > 0
     ? cat.categories.slice(0, 8).map(c =>
         `  ${c.category}: ${currency(c.revenue)} (${pct(c.percentage)}, ${num(c.invoice_count)} invoices)`
@@ -94,13 +95,14 @@ function buildRevenuePrompt(data, month, center) {
   );
 }
 
-// ─ Leaderboard ───────────────────────────────────────────────────────────────
-// data shape from Leaderboard.jsx onData:
-//   { staff: {data, total}, serviceTypes: {data, total}, referrals: {data, total} }
+// Leaderboard — data: { staff, serviceTypes, referrals }
+// staff shape:        { data:[{rank,staff,revenue,share,invoice_count,asp}], total }
+// serviceTypes shape: { data:[{servicer,revenue,invoices,asp,share}], total }
+// referrals shape:    { data:[{source,count,revenue,share}], total }
 function buildLeaderboardPrompt(data, month, center) {
-  const staffRows = (data.staff?.data || []).slice(0, 10);
+  const staffRows = (data.staff?.data        || []).slice(0, 10);
   const svcRows   = (data.serviceTypes?.data || []).slice(0, 8);
-  const refRows   = (data.referrals?.data || []).slice(0, 6);
+  const refRows   = (data.referrals?.data    || []).slice(0, 6);
 
   const staffBlock = staffRows.length > 0
     ? staffRows.map(r =>
@@ -135,10 +137,11 @@ function buildLeaderboardPrompt(data, month, center) {
   );
 }
 
-// ─ Appointments ──────────────────────────────────────────────────────────────
-// data shape from Appointments.jsx onData:
-//   { summary, byStatus, byCategory, byProvider, byBookingSource }
-// NOTE: summary already contains rebook_rate + first_visit_rate from the merged backend query.
+// Appointments — data: { summary, byStatus, byCategory, byProvider, byBookingSource }
+// summary shape: { total_appointments, closed, noshows, cancelled, rebooked,
+//                  first_visits, surprise_visits, addons, avg_per_day,
+//                  noshow_rate, cancel_rate, rebook_rate, first_visit_rate,
+//                  utilisation_pct, avg_actual_duration_min }
 function buildAppointmentsPrompt(data, month, center) {
   const s = data.summary || {};
 
@@ -192,21 +195,14 @@ function buildAppointmentsPrompt(data, month, center) {
   );
 }
 
-// ─ Utilization ───────────────────────────────────────────────────────────────
-// data shape from Utilization.jsx onData:
-//   { providers, revPerHour, roleSummary }
-//
-// FIXED: original code read data.providerUtil and data.revenuePerHour
-//        but Utilization.jsx sends data.providers and data.revPerHour.
-//        All three key names corrected below.
+// Utilization — data: { providers, revPerHour, roleSummary }
+// providers shape:   [{ employee, role, center, scheduled_hours, booked_hours, utilization_pct }]
+// revPerHour shape:  [{ employee, role, center, booked_hours, scheduled_hours, revenue, rev_per_hour, utilization_pct }]
+// roleSummary shape: [{ role, headcount, scheduled_hours, booked_hours, revenue, utilization_pct, rev_per_hour }]
 function buildUtilizationPrompt(data, month, center) {
-  // CORRECTED key names to match Utilization.jsx onData call:
-  //   providers   (was: providerUtil)
-  //   revPerHour  (was: revenuePerHour)
-  //   roleSummary (unchanged — was already correct)
-  const roleRows  = (data.roleSummary  || []);
-  const provRows  = (data.providers    || []).slice(0, 10);   // FIXED: was data.providerUtil
-  const revRows   = (data.revPerHour   || []).slice(0, 10);   // FIXED: was data.revenuePerHour
+  const roleRows = (data.roleSummary || []);
+  const provRows = (data.providers   || []).slice(0, 10);
+  const revRows  = (data.revPerHour  || []).slice(0, 10);
 
   const roleBlock = roleRows.length > 0
     ? roleRows.map(r =>
@@ -247,7 +243,6 @@ function buildUtilizationPrompt(data, month, center) {
   );
 }
 
-// ── Route to correct builder ──────────────────────────────────────────────────
 function buildPrompt(tab, data, month, center) {
   if (tab === "revenue")      return buildRevenuePrompt(data, month, center);
   if (tab === "leaderboard")  return buildLeaderboardPrompt(data, month, center);
@@ -256,27 +251,29 @@ function buildPrompt(tab, data, month, center) {
   return "No data available for this view.";
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Component ──────────────────────────────────────────────────────────────────
 // Props:
 //   tab     — "revenue" | "leaderboard" | "appointments" | "utilization"
-//   data    — object collected by the active panel's onData callback
-//   loading — true while the panel is fetching its data
-//   month   — "YYYY-MM" string
-//   center  — selected center string or "All"
+//   data    — object bubbled up by the panel's onData callback
+//   loading — true while the panel is fetching
+//   month   — "YYYY-MM"
+//   center  — center name or "All"
 export default function AiInsights({ tab, data, loading, month, center }) {
+  const [open,      setOpen]      = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [insight,   setInsight]   = useState("");
   const [error,     setError]     = useState("");
 
-  const lastKeyRef      = useRef(null);
-  const pendingKeyRef   = useRef(null);
-  const mountedRef      = useRef(true);
-  const abortRef        = useRef(null);
-  // firstLoadDoneRef: skips the very first loading→false transition (cold open).
-  // hasInteractedRef: flips true when the user changes tab/month/center for the
-  //   first time, enabling auto-generate on subsequent data loads.
+  // ── Ported verbatim from v1 ────────────────────────────────────────────────
+  // lastKeyRef:      the last tab|month|center key we actually fired for
+  // pendingKeyRef:   a key that arrived while loading was true — fire it once loading ends
+  // firstLoadDoneRef: blocks auto-trigger until the very first data load finishes;
+  //                   on first open the user clicks the button manually instead
+  const lastKeyRef       = useRef(null);
+  const pendingKeyRef    = useRef(null);
+  const mountedRef       = useRef(true);
+  const abortRef         = useRef(null);
   const firstLoadDoneRef = useRef(false);
-  const hasInteractedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -286,9 +283,10 @@ export default function AiInsights({ tab, data, loading, month, center }) {
     };
   }, []);
 
-  // ── Generate ──────────────────────────────────────────────────────────────
+  // ── Generate ───────────────────────────────────────────────────────────────
   const generate = useCallback(async () => {
     if (!mountedRef.current) return;
+
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -296,6 +294,7 @@ export default function AiInsights({ tab, data, loading, month, center }) {
     setAiLoading(true);
     setError("");
     setInsight("");
+    setOpen(true); // auto-open the panel when generating
 
     const prompt = buildPrompt(tab, data, month, center);
 
@@ -324,11 +323,11 @@ export default function AiInsights({ tab, data, loading, month, center }) {
     setAiLoading(false);
   }, [tab, data, month, center]); // eslint-disable-line
 
-  // ── Auto-trigger on tab / month / center change ────────────────────────────
+  // ── Auto-trigger on tab / month / center change (v1 pattern) ──────────────
+  // Blocked until firstLoadDoneRef flips true (i.e. after the first manual click).
+  // On subsequent filter changes, queues or fires immediately depending on loading state.
   useEffect(() => {
     if (!firstLoadDoneRef.current) return;
-
-    hasInteractedRef.current = true;
 
     const key = `${tab}|${month}|${center}`;
     setInsight("");
@@ -344,26 +343,26 @@ export default function AiInsights({ tab, data, loading, month, center }) {
     }
   }, [tab, month, center]); // eslint-disable-line
 
-  // ── Fire once data finishes loading ───────────────────────────────────────
+  // ── Fire pending request once panel finishes loading (v1 pattern) ──────────
   useEffect(() => {
     if (loading) return;
 
+    // First loading→false: mark as done, do NOT fire — user clicks manually.
     if (!firstLoadDoneRef.current) {
       firstLoadDoneRef.current = true;
       return;
     }
 
-    if (!hasInteractedRef.current) return;
-
     const key = `${tab}|${month}|${center}`;
-    if (lastKeyRef.current === key) return;
+    if (pendingKeyRef.current !== key) return;
+    if (lastKeyRef.current    === key) return;
 
     lastKeyRef.current    = key;
     pendingKeyRef.current = null;
     generate();
   }, [loading]); // eslint-disable-line
 
-  // ── UI ────────────────────────────────────────────────────────────────────
+  // ── UI ─────────────────────────────────────────────────────────────────────
   const TAB_LABEL = {
     revenue:      "Revenue",
     leaderboard:  "Leaderboard",
@@ -373,50 +372,85 @@ export default function AiInsights({ tab, data, loading, month, center }) {
 
   return (
     <div className="ai-insights-wrap">
-      <div className="ai-insights-panel">
-        <div className="ai-insights-header">
-          <span className="ai-insights-title">✦ AI Insights</span>
-          <span className="ai-insights-meta">
-            {TAB_LABEL[tab] || tab} · {month}
-            {center && center !== "All" ? ` · ${center}` : ""}
-          </span>
-          {!aiLoading && !loading && (
+      {/* Button — shown above the panel; collapses/reopens it */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button
+          className="ai-insights-btn"
+          onClick={() => open ? setOpen(false) : (insight ? setOpen(true) : generate())}
+          disabled={aiLoading || loading}
+        >
+          {loading
+            ? "⟳ Loading data…"
+            : aiLoading
+            ? "⟳ Analyzing…"
+            : open
+            ? "▾ Hide Insights"
+            : "✦ Show Insights"}
+        </button>
+      </div>
+
+      {open && (
+        <div className="ai-insights-panel">
+          <div className="ai-insights-header">
+            <span className="ai-insights-title">✦ AI Insights</span>
+            <span className="ai-insights-meta">
+              {TAB_LABEL[tab] || tab} · {month}
+              {center && center !== "All" ? ` · ${center}` : ""}
+            </span>
             <button
-              className="ai-insights-btn"
-              onClick={generate}
-              disabled={aiLoading || loading}
-              style={{ marginLeft: "auto" }}
-            >
-              ↻ Regenerate
-            </button>
+              className="ai-insights-close"
+              onClick={() => setOpen(false)}
+              title="Close"
+            >✕</button>
+          </div>
+
+          {loading && !aiLoading && (
+            <div className="ai-insights-loading">
+              <span className="ai-pulse">●</span>
+              <span className="ai-pulse" style={{ animationDelay: "0.2s" }}>●</span>
+              <span className="ai-pulse" style={{ animationDelay: "0.4s" }}>●</span>
+              &nbsp; Waiting for dashboard data…
+            </div>
+          )}
+
+          {aiLoading && (
+            <div className="ai-insights-loading">
+              <span className="ai-pulse">●</span>
+              <span className="ai-pulse" style={{ animationDelay: "0.2s" }}>●</span>
+              <span className="ai-pulse" style={{ animationDelay: "0.4s" }}>●</span>
+              &nbsp; Analyzing data…
+            </div>
+          )}
+
+          {error && (
+            <div className="ai-insights-error">
+              ⚠ {error}
+              <button
+                onClick={generate}
+                style={{ marginLeft: 12, fontSize: 11, cursor: "pointer",
+                         background: "none", border: "none", color: "#991b1b",
+                         textDecoration: "underline" }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {insight && !aiLoading && (
+            <div className="ai-insights-body">
+              {insight.split("\n").filter(Boolean).map((line, i) => (
+                <p key={i}>{line}</p>
+              ))}
+            </div>
+          )}
+
+          {!loading && !aiLoading && !error && !insight && (
+            <div className="ai-insights-loading" style={{ color: "#aaa" }}>
+              Click "✦ Show Insights" to analyze this view.
+            </div>
           )}
         </div>
-
-        {(loading || aiLoading) && (
-          <div className="ai-insights-loading">
-            <span className="ai-pulse">●</span>
-            <span className="ai-pulse" style={{ animationDelay: "0.2s" }}>●</span>
-            <span className="ai-pulse" style={{ animationDelay: "0.4s" }}>●</span>
-            &nbsp;{loading ? "Waiting for dashboard data…" : "Analyzing data…"}
-          </div>
-        )}
-
-        {error && <div className="ai-insights-error">⚠ {error}</div>}
-
-        {insight && !aiLoading && (
-          <div className="ai-insights-body">
-            {insight.split("\n").filter(Boolean).map((line, i) => (
-              <p key={i}>{line}</p>
-            ))}
-          </div>
-        )}
-
-        {!loading && !aiLoading && !error && !insight && (
-          <div className="ai-insights-loading" style={{ color: "#aaa" }}>
-            Insights will appear here once data is loaded.
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
