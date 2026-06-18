@@ -2,9 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from "recharts";
+import { AlertTriangleIcon } from "../Icons";
 
 const MEDAL = ["🥇","🥈","🥉"];
-const BAR_COLORS = ["#3d2b1f","#7a5c3e","#a0845c","#c4a882","#e8d5b0"];
+const BAR_COLORS = [
+  "var(--accent)", "var(--secondary-brand)", "var(--accent-bar)",
+  "var(--champagne)", "var(--sand)",
+];
 
 function fmt(n, compact=false) {
   if (n === null || n === undefined) return "$—";
@@ -21,7 +25,7 @@ function MiniBar({ value, max }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
     <div style={{background:"var(--grid)",borderRadius:3,height:6,width:"100%",marginTop:3}}>
-      <div style={{background:"var(--accent-bar)",borderRadius:3,height:6,width:`${pct}%`,transition:"width 0.6s ease"}}/>
+      <div style={{background:"var(--accent)",borderRadius:3,height:6,width:`${pct}%`,transition:"width 0.6s ease"}}/>
     </div>
   );
 }
@@ -129,7 +133,7 @@ function ReferralTable({ data }) {
             <span style={{color:"var(--text-muted)"}}>{r.count} visits · {fmt(r.revenue,true)}</span>
           </div>
           <div style={{background:"var(--grid)",borderRadius:3,height:5}}>
-            <div style={{background:"var(--accent-line)",borderRadius:3,height:5,
+            <div style={{background:"var(--accent-dark)",borderRadius:3,height:5,
                          width:`${max>0?(r.count/max)*100:0}%`,transition:"width 0.5s ease"}}/>
           </div>
         </div>
@@ -180,7 +184,7 @@ export default function Leaderboard({ apiBase, month, center, onData, aiInsights
 
   return (
     <div className="dash-content">
-      {error && <div className="error-bar">⚠ {error}</div>}
+      {error && <div className="error-bar"><AlertTriangleIcon size={14} />{error}</div>}
 
       {loading ? (
         <>

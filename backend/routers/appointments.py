@@ -274,14 +274,19 @@ async def appointments(request: Request):
                 for r in rows
             }
             weeks = []
-            for week_num in range(4):
+            last_day_of_month = ctx["start_date"] + timedelta(days=ctx["days_in_month"] - 1)
+            week_num = 0
+            while True:
                 week_start = ctx["start_date"] + timedelta(days=week_num * 7)
+                if week_start > last_day_of_month:
+                    break
                 totals = {"total": 0, "closed": 0, "noshows": 0, "cancelled": 0}
                 for d in range(7):
                     day_str = str(week_start + timedelta(days=d))
                     for k in totals:
                         totals[k] += daily.get(day_str, {}).get(k, 0)
                 weeks.append({"week": f"Week {week_num + 1}", **totals})
+                week_num += 1
             for i, week in enumerate(weeks):
                 prev        = weeks[i - 1]["total"] if i > 0 else 0
                 week["wow"] = (

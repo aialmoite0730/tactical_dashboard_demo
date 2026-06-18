@@ -3,18 +3,23 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell,
 } from "recharts";
+import {
+  DollarIcon, TrendingUpIcon, CalendarIcon, ClockIcon, StarIcon,
+  DropletIcon, CashIcon, PieChartIcon, AlertTriangleIcon,
+  ArrowUpIcon, ArrowDownIcon, ChevronDownIcon,
+} from "../Icons";
 
-const DONUT_COLORS = ["#3d2b1f","#7a5c3e","#c4a882","#e8d5b0","#a0845c","#5c3d28","#d4b896","#f0e6d3"];
+const DONUT_COLORS = [
+  "var(--chart-cat-1)", "var(--chart-cat-2)", "var(--chart-cat-3)",
+  "var(--chart-cat-4)", "var(--chart-cat-5)", "var(--chart-cat-6)",
+  "var(--secondary-brand)", "var(--accent-bar)",
+];
 
 function fmt(n, compact = false) {
   if (n === null || n === undefined) return "$—";
   if (compact && n >= 1_000_000) return `$${(n/1_000_000).toFixed(2)}M`;
   if (compact && n >= 1_000)     return `$${(n/1_000).toFixed(0)}K`;
   return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n);
-}
-function fmtPct(v) {
-  if (v === null || v === undefined) return "—";
-  return `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
 }
 function fmtAxisY(v)  { return `$${(v/1000).toFixed(0)}K`; }
 function fmtAxisY2(v) { return `$${(v/1_000_000).toFixed(1)}M`; }
@@ -47,10 +52,13 @@ function AnimNum({ value }) {
   );
 }
 
-function KpiCard({ label, value, subLabel, subValue, highlight, note }) {
+function KpiCard({ label, value, subLabel, subValue, highlight, note, icon }) {
   return (
     <div className={`kpi-card${highlight ? " kpi-card--highlight" : ""}`}>
-      <div className="kpi-label">{label}</div>
+      <div className="kpi-card-top">
+        {icon && <div className="kpi-icon">{icon}</div>}
+        <div className="kpi-label">{label}</div>
+      </div>
       <div className="kpi-value"><AnimNum value={value ?? 0} /></div>
       {subValue !== undefined && (
         <div className="kpi-sub">
@@ -99,8 +107,8 @@ function RevenueChart({ data }) {
     <div className="chart-card">
       <div className="chart-title">Daily revenue · MTD cumulative · Goal pace</div>
       <div className="chart-legend-row">
-        <span style={{color:"var(--accent-bar)"}}>■ Daily</span>
-        <span style={{color:"var(--accent-line)"}}>— MTD</span>
+        <span style={{color:"var(--accent)"}}>■ Daily</span>
+        <span style={{color:"var(--accent-dark)"}}>— MTD</span>
         <span style={{color:"var(--accent-goal)"}}>- - Goal</span>
       </div>
       <div style={{display:"flex",gap:0}}>
@@ -112,8 +120,8 @@ function RevenueChart({ data }) {
             <YAxis yAxisId="left" tickFormatter={fmtAxisY} tick={{fontSize:9,fill:"var(--text-muted)"}} tickLine={false} axisLine={false} width={44}/>
             <YAxis yAxisId="right" orientation="right" tickFormatter={fmtAxisY2} tick={{fontSize:9,fill:"var(--text-muted)"}} tickLine={false} axisLine={false} width={48}/>
             <Tooltip content={<ChartTooltip/>}/>
-            <Bar yAxisId="left" dataKey="daily_revenue" name="Daily revenue" fill="var(--accent-bar)" radius={[2,2,0,0]} maxBarSize={16}/>
-            <Line yAxisId="right" type="monotone" dataKey="mtd_cumulative" name="MTD cumulative" stroke="var(--accent-line)" strokeWidth={2} dot={false}/>
+            <Bar yAxisId="left" dataKey="daily_revenue" name="Daily revenue" fill="var(--accent)" radius={[2,2,0,0]} maxBarSize={16}/>
+            <Line yAxisId="right" type="monotone" dataKey="mtd_cumulative" name="MTD cumulative" stroke="var(--accent-dark)" strokeWidth={2} dot={false}/>
             <Line yAxisId="right" type="monotone" dataKey="goal_mtd" name="Goal MTD" stroke="var(--accent-goal)" strokeWidth={1.5} strokeDasharray="5 3" dot={false}/>
           </ComposedChart>
         </ResponsiveContainer>
@@ -159,21 +167,72 @@ function CategoryChart({ categories, total }) {
   );
 }
 
-function WeeklyTable({ weekly }) {
+function WeekRow({ week, daily, isOpen, onToggle }) {
+  const dayRows = isOpen
+    ? daily.filter(d => d.date >= week.start && d.date <= week.end)
+    : [];
+  const wowKnown = week.wow !== null && week.wow !== undefined;
+  const wowPos   = wowKnown && week.wow >= 0;
+
+  return (
+    <>
+      <tr className="week-row" onClick={onToggle}>
+        <td className="week-row-label">
+          <span className={`week-chevron${isOpen ? " open" : ""}`}>
+            <ChevronDownIcon size={13} />
+          </span>
+          <strong>{week.week}</strong>
+          {week.label && <span className="week-range">({week.label})</span>}
+        </td>
+        <td>{fmt(week.revenue)}</td>
+        <td className={!wowKnown ? "" : wowPos ? "wow-pos" : "wow-neg"}>
+          {!wowKnown ? "—" : (
+            <span className="wow-cell">
+              {wowPos ? <ArrowUpIcon size={12} /> : <ArrowDownIcon size={12} />}
+              {Math.abs(week.wow).toFixed(2)}%
+            </span>
+          )}
+        </td>
+      </tr>
+      {dayRows.map(d => (
+        <tr key={d.date} className="day-subrow">
+          <td className="day-subrow-label">{fmtDate(d.date)}</td>
+          <td>{fmt(d.daily_revenue)}</td>
+          <td />
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function WeeklyTable({ weekly, daily = [] }) {
   const { weeks=[], full_month_pace=0 } = weekly || {};
+  const [openWeek, setOpenWeek] = useState(null);
+
   return (
     <div className="weekly-card">
       <table className="weekly-table">
-        <thead><tr><th>Week</th><th>Revenue</th><th>WoW</th></tr></thead>
+        <thead>
+          <tr>
+            <th className="weekly-th-title">
+              <span className="weekly-th-title-inner">
+                <CalendarIcon size={14} />
+                Weekly Revenue Summary
+              </span>
+            </th>
+            <th>Revenue</th>
+            <th>WoW</th>
+          </tr>
+        </thead>
         <tbody>
           {weeks.map(w => (
-            <tr key={w.week}>
-              <td>{w.week}</td>
-              <td>{fmt(w.revenue)}</td>
-              <td className={w.wow===null?"":w.wow>=0?"wow-pos":"wow-neg"}>
-                {w.wow===null?"—":fmtPct(w.wow)}
-              </td>
-            </tr>
+            <WeekRow
+              key={w.week}
+              week={w}
+              daily={daily}
+              isOpen={openWeek === w.week}
+              onToggle={() => setOpenWeek(openWeek === w.week ? null : w.week)}
+            />
           ))}
           <tr className="pace-row">
             <td>Full month pace</td><td>{fmt(full_month_pace)}</td><td/>
@@ -230,7 +289,7 @@ export default function Revenue({ apiBase, month, center, onData, aiInsights }) 
 
   return (
     <div className="dash-content">
-      {error && <div className="error-bar">⚠ {error}</div>}
+      {error && <div className="error-bar"><AlertTriangleIcon size={14} />{error}</div>}
 
       {/* ── KPI Row ── */}
       {loading ? (
@@ -246,39 +305,42 @@ export default function Revenue({ apiBase, month, center, onData, aiInsights }) 
           {summary?.goal > 0 && <GoalBar mtd={summary.mtd_revenue} goal={summary.goal}/>}
           {/* Row 1: Revenue KPIs */}
           <div className="kpi-row">
-            <KpiCard label="MTD Revenue"  value={summary?.mtd_revenue}  subLabel="Yest:" subValue={summary?.yesterday_revenue} highlight/>
-            <KpiCard label="Projected"    value={summary?.projected}/>
-            <KpiCard label="Rev / Day"    value={summary?.rev_per_day}/>
-            <KpiCard label="Rev / Hour"   value={summary?.rev_per_hour}/>
-            <KpiCard label="30-Day ADV"   value={summary?.adv}/>
+            <KpiCard icon={<DollarIcon size={17} />}     label="MTD Revenue"  value={summary?.mtd_revenue}  subLabel="Yest:" subValue={summary?.yesterday_revenue} highlight/>
+            <KpiCard icon={<TrendingUpIcon size={17} />} label="Projected"    value={summary?.projected}/>
+            <KpiCard icon={<CalendarIcon size={17} />}   label="Rev / Day"    value={summary?.rev_per_day}/>
+            <KpiCard icon={<ClockIcon size={17} />}      label="Rev / Hour"   value={summary?.rev_per_hour}/>
+            <KpiCard icon={<StarIcon size={17} />}       label="30-Day ADV"   value={summary?.adv}/>
           </div>
           {/* Row 2: NEW — ASP + Cash sales */}
           <div className="kpi-row" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
             <KpiCard
+              icon={<DropletIcon size={17} />}
               label="Avg. Selling Price (ASP)"
               value={summary?.asp}
               note={`${summary?.invoice_count ?? 0} invoices`}
               highlight
             />
             <KpiCard
+              icon={<CashIcon size={17} />}
               label="Cash Sales MTD"
               value={summary?.cash_sales}
               note="payment_type = Cash"
             />
-            <div className="kpi-card" style={{display:"flex",flexDirection:"column",justifyContent:"center"}}>
-              <div className="kpi-label">Cash vs Total</div>
-              <div style={{fontSize:22,fontWeight:700,color:"var(--text)"}}>
+            <div className="kpi-card">
+              <div className="kpi-card-top">
+                <div className="kpi-icon"><PieChartIcon size={17} /></div>
+                <div className="kpi-label">Cash vs Total</div>
+              </div>
+              <div className="kpi-value">
                 {summary?.mtd_revenue > 0
                   ? ((summary.cash_sales / summary.mtd_revenue) * 100).toFixed(1) + "%"
                   : "—"}
               </div>
-              <div style={{marginTop:6,height:6,background:"var(--grid)",borderRadius:3}}>
-                <div style={{
-                  height:6, borderRadius:3, background:"var(--accent-bar)",
+              <div className="stat-progress-track">
+                <div className="stat-progress-fill" style={{
                   width: summary?.mtd_revenue > 0
                     ? `${Math.min((summary.cash_sales/summary.mtd_revenue)*100,100)}%`
                     : "0%",
-                  transition:"width .8s ease"
                 }}/>
               </div>
             </div>
@@ -310,7 +372,7 @@ export default function Revenue({ apiBase, month, center, onData, aiInsights }) 
       {loading ? (
         <div className="weekly-card" style={{padding:16}}><Skeleton h="140px"/></div>
       ) : loaded ? (
-        <WeeklyTable weekly={weekly}/>
+        <WeeklyTable weekly={weekly} daily={daily}/>
       ) : null}
     </div>
   );

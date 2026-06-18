@@ -17,6 +17,8 @@ Performance notes:
 """
 
 import os
+import math
+import calendar
 import asyncio
 from datetime import timedelta
 from fastapi import APIRouter, Request
@@ -242,13 +244,35 @@ async def revenue(request: Request):
             """
             rows  = await run_query_async(q)
             daily = {str(r.day): to_float(r.daily_revenue) for r in rows}
+
+            # FIXED: was hardcoded to exactly 4 weeks (28 days), which silently
+            # dropped the tail of any month longer than 28 days — e.g. Jan 29-31
+            # never appeared in the table or in full_month_pace. Now derives the
+            # week count from days_in_month and clips the final week to the
+            # real end of the month (so month-end shows as a partial week,
+            # same as the reference design).
+            days_in_month  = ctx["days_in_month"]
+            num_weeks      = math.ceil(days_in_month / 7)
+            month_end_date = ctx["start_date"] + timedelta(days=days_in_month - 1)
+
+            def short(d):
+                return f"{calendar.month_abbr[d.month]} {d.day}"
+
             weeks = []
-            for week_num in range(4):
+            for week_num in range(num_weeks):
                 week_start = ctx["start_date"] + timedelta(days=week_num * 7)
+                week_end   = min(week_start + timedelta(days=6), month_end_date)
+                span_days  = (week_end - week_start).days + 1
                 total = sum(
-                    daily.get(str(week_start + timedelta(days=d)), 0) for d in range(7)
+                    daily.get(str(week_start + timedelta(days=d)), 0) for d in range(span_days)
                 )
-                weeks.append({"week": f"Week {week_num + 1}", "revenue": total})
+                weeks.append({
+                    "week":    f"Week {week_num + 1}",
+                    "label":   f"{short(week_start)} – {short(week_end)}",
+                    "start":   str(week_start),
+                    "end":     str(week_end),
+                    "revenue": total,
+                })
             for i, week in enumerate(weeks):
                 prev        = weeks[i - 1]["revenue"] if i > 0 else 0
                 week["wow"] = (

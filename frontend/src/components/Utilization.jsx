@@ -3,6 +3,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
+import {
+  GaugeIcon, ClockIcon, CalendarIcon, TrendingUpIcon, DollarIcon, AlertTriangleIcon,
+} from "../Icons";
 
 const fmtNum = (n, dec = 0) =>
   (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
@@ -15,13 +18,13 @@ function fmt(n, compact = false) {
 }
 
 const C = {
-  bar:   "#7a5c3e",
-  bar2:  "#b89a6a",
-  grid:  "#ede6da",
-  muted: "#8a7a6a",
-  good:  "#2d6a4f",
-  warn:  "#92400e",
-  ROLE:  ["#3d2b1f","#7a5c3e","#b89a6a","#d4aa7d","#e8cfa8"],
+  bar:   "var(--accent-bar)",
+  grid:  "var(--grid)",
+  muted: "var(--text-muted)",
+  good:  "var(--positive)",
+  warn:  "var(--warning)",
+  crit:  "var(--negative)",
+  ROLE:  ["var(--accent)", "var(--secondary-brand)", "var(--accent-bar)", "var(--champagne)", "var(--sand)"],
 };
 
 function Skeleton({ h = 20, w = "100%" }) {
@@ -34,10 +37,13 @@ function Skeleton({ h = 20, w = "100%" }) {
   );
 }
 
-function KpiCard({ label, value, sub, highlight }) {
+function KpiCard({ label, value, sub, highlight, icon }) {
   return (
-    <div className="kpi-card" style={highlight ? { borderColor: "var(--accent-bar)" } : {}}>
-      <div className="kpi-label">{label}</div>
+    <div className={`kpi-card${highlight ? " kpi-card--highlight" : ""}`}>
+      <div className="kpi-card-top">
+        {icon && <div className="kpi-icon">{icon}</div>}
+        <div className="kpi-label">{label}</div>
+      </div>
       <div className="kpi-value">{value ?? "—"}</div>
       {sub && <div className="kpi-sub">{sub}</div>}
     </div>
@@ -45,7 +51,7 @@ function KpiCard({ label, value, sub, highlight }) {
 }
 
 function UtilBar({ label, role, scheduledHrs, bookedHrs, utilPct, revPerHour }) {
-  const color = utilPct >= 80 ? C.good : utilPct >= 50 ? C.bar : C.warn;
+  const color = utilPct >= 80 ? C.good : utilPct >= 50 ? C.warn : C.crit;
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
@@ -123,21 +129,21 @@ export default function Utilization({ apiBase, month, center, onData, aiInsights
 
   return (
     <div className="dash-content">
-      {error && <div className="error-bar">⚠ {error}</div>}
+      {error && <div className="error-bar"><AlertTriangleIcon size={14} />{error}</div>}
 
       {/* ── Summary KPIs ── */}
       <div className="kpi-row">
-        <KpiCard highlight label="Avg. Utilisation"
+        <KpiCard highlight icon={<GaugeIcon size={17} />} label="Avg. Utilisation"
           value={avgUtil !== "—" ? avgUtil + "%" : "—"}
           sub="booked ÷ scheduled hrs" />
-        <KpiCard label="Total Booked Hours"
+        <KpiCard icon={<ClockIcon size={17} />} label="Total Booked Hours"
           value={fmtNum(totalBooked, 1) + " h"} />
-        <KpiCard label="Total Sched. Hours"
+        <KpiCard icon={<CalendarIcon size={17} />} label="Total Sched. Hours"
           value={fmtNum(totalSched, 1) + " h"} />
-        <KpiCard label="Revenue / Util. Hour"
+        <KpiCard icon={<TrendingUpIcon size={17} />} label="Revenue / Util. Hour"
           value={fmt(avgRevHr, true)}
           sub="total rev ÷ booked hrs" />
-        <KpiCard label="Total Revenue (linked)"
+        <KpiCard icon={<DollarIcon size={17} />} label="Total Revenue (linked)"
           value={fmt(totalRev, true)} />
       </div>
 
@@ -174,7 +180,7 @@ export default function Utilization({ apiBase, month, center, onData, aiInsights
                   <td style={{ textAlign: "right" }}>
                     <span style={{
                       fontWeight: 700,
-                      color: r.utilization_pct >= 80 ? C.good : r.utilization_pct >= 50 ? C.bar : C.warn,
+                      color: r.utilization_pct >= 80 ? C.good : r.utilization_pct >= 50 ? C.warn : C.crit,
                     }}>
                       {r.utilization_pct}%
                     </span>

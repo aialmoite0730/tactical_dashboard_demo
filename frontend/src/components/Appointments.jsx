@@ -3,6 +3,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
 } from "recharts";
+import {
+  AppointmentsIcon, AlertCircleIcon, XCircleIcon, RepeatIcon, UserPlusIcon,
+  TrendingUpIcon, ZapIcon, GaugeIcon, ClockIcon, PlusCircleIcon, AlertTriangleIcon,
+} from "../Icons";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtNum = (n, dec = 0) =>
@@ -18,21 +22,25 @@ const post = async (base, path, body) => {
   return res.json();
 };
 
-// ─── Status palette (confirmed from schema) ───────────────────────────────────
+// ─── Status palette ───────────────────────────────────────────────────────────
 const STATUS_COLORS = {
-  "Closed":           "#2d6a4f",
-  "Closed (No Show)": "#9b1c1c",
-  "Cancelled":        "#92400e",
-  "Open":             "#b89a6a",
-  "default":          "#aaa",
+  "Closed":           "var(--positive)",
+  "Closed (No Show)": "var(--negative)",
+  "Cancelled":        "var(--warning)",
+  "Open":             "var(--secondary-brand)",
+  "default":          "var(--text-light)",
 };
 
 const C = {
-  bar:   "#7a5c3e",
-  bar2:  "#b89a6a",
-  grid:  "#ede6da",
-  muted: "#8a7a6a",
-  DONUT: ["#3d2b1f","#7a5c3e","#b89a6a","#d4aa7d","#e8cfa8","#c9a96e","#8b6348","#a07850"],
+  bar:   "var(--accent-bar)",
+  bar2:  "var(--secondary-brand)",
+  grid:  "var(--grid)",
+  muted: "var(--text-muted)",
+  DONUT: [
+    "var(--chart-cat-1)", "var(--chart-cat-2)", "var(--chart-cat-3)",
+    "var(--chart-cat-4)", "var(--chart-cat-5)", "var(--chart-cat-6)",
+    "var(--secondary-brand)", "var(--accent-bar)",
+  ],
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -46,10 +54,13 @@ function Skeleton({ h = 20, w = "100%" }) {
   );
 }
 
-function KpiCard({ label, value, sub, loading, highlight, note }) {
+function KpiCard({ label, value, sub, loading, highlight, note, icon }) {
   return (
-    <div className="kpi-card" style={highlight ? { borderColor: "var(--accent-bar)" } : {}}>
-      <div className="kpi-label">{label}</div>
+    <div className={`kpi-card${highlight ? " kpi-card--highlight" : ""}`}>
+      <div className="kpi-card-top">
+        {icon && <div className="kpi-icon">{icon}</div>}
+        <div className="kpi-label">{label}</div>
+      </div>
       {loading ? <Skeleton h={28} w="70%" /> : <div className="kpi-value">{value ?? "—"}</div>}
       {sub  && !loading && <div className="kpi-sub">{sub}</div>}
       {note && !loading && <div className="kpi-note">{note}</div>}
@@ -179,25 +190,25 @@ export default function Appointments({ apiBase, month, center, onData, aiInsight
 
   return (
     <div className="dash-content">
-      {error && <div className="error-bar">⚠ {error}</div>}
+      {error && <div className="error-bar"><AlertTriangleIcon size={14} />{error}</div>}
 
       {/* ── KPI Row 1: Volume + Rates ── */}
       <div className="kpi-row">
-        <KpiCard highlight loading={loading} label="Appointments MTD"
+        <KpiCard highlight loading={loading} icon={<AppointmentsIcon size={17} />} label="Appointments MTD"
           value={summary ? fmtNum(summary.total_appointments) : null}
           sub={summary ? `${fmtNum(summary.closed)} completed` : null} />
-        <KpiCard loading={loading} label="No-Show Rate"
+        <KpiCard loading={loading} icon={<AlertCircleIcon size={17} />} label="No-Show Rate"
           value={summary ? summary.noshow_rate + "%" : null}
           sub={summary ? `${fmtNum(summary.noshows)} no-shows` : null} />
-        <KpiCard loading={loading} label="Cancellation Rate"
+        <KpiCard loading={loading} icon={<XCircleIcon size={17} />} label="Cancellation Rate"
           value={summary ? summary.cancel_rate + "%" : null}
           sub={summary ? `${fmtNum(summary.cancelled)} cancelled` : null} />
         {/* CORRECTED: rebook_rate = rebooked / closed (not / total) */}
-        <KpiCard loading={loading} label="Rebook Rate"
+        <KpiCard loading={loading} icon={<RepeatIcon size={17} />} label="Rebook Rate"
           value={rebookData ? rebookData.rebook_rate + "%" : null}
           sub={rebookData ? `${fmtNum(rebookData.rebooked)} of ${fmtNum(rebookData.closed)} closed` : null}
           note="Rebooked ÷ Completed" />
-        <KpiCard loading={loading} label="First-Visit Rate"
+        <KpiCard loading={loading} icon={<UserPlusIcon size={17} />} label="First-Visit Rate"
           value={rebookData ? rebookData.first_visit_rate + "%" : null}
           sub={rebookData ? `${fmtNum(rebookData.first_visits)} new guests` : null}
           note="First visits ÷ Completed" />
@@ -205,18 +216,18 @@ export default function Appointments({ apiBase, month, center, onData, aiInsight
 
       {/* ── KPI Row 2: Ops ── */}
       <div className="kpi-row">
-        <KpiCard loading={loading} label="Avg. Appts / Day"
+        <KpiCard loading={loading} icon={<TrendingUpIcon size={17} />} label="Avg. Appts / Day"
           value={summary ? summary.avg_per_day : null} />
-        <KpiCard loading={loading} label="Surprise Visits"
+        <KpiCard loading={loading} icon={<ZapIcon size={17} />} label="Surprise Visits"
           value={summary ? fmtNum(summary.surprise_visits) : null} />
-        <KpiCard loading={loading} label="Utilisation"
+        <KpiCard loading={loading} icon={<GaugeIcon size={17} />} label="Utilisation"
           value={summary ? summary.utilisation_pct + "%" : null}
           note="Sched. min ÷ (days × 10h × 60)" />
-        <KpiCard loading={loading} label="Avg. Duration"
+        <KpiCard loading={loading} icon={<ClockIcon size={17} />} label="Avg. Duration"
           value={summary?.avg_actual_duration_min != null
             ? summary.avg_actual_duration_min + " min"
             : null} />
-        <KpiCard loading={loading} label="Add-ons"
+        <KpiCard loading={loading} icon={<PlusCircleIcon size={17} />} label="Add-ons"
           value={rebookData ? fmtNum(rebookData.addons) : null}
           sub="appts with add-on" />
       </div>
