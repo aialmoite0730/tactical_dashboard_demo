@@ -115,10 +115,9 @@ export function PieChartIcon(props) {
 export function ChartBarIcon(props) {
   return (
     <Icon {...props}>
-      <line x1="3" y1="20" x2="21" y2="20" />
-      <rect x="5" y="13" width="3.5" height="7" rx="0.9" fill="currentColor" stroke="none" />
-      <rect x="10.25" y="9" width="3.5" height="11" rx="0.9" fill="currentColor" stroke="none" />
-      <rect x="15.5" y="6" width="3.5" height="14" rx="0.9" fill="currentColor" stroke="none" />
+      <rect x="3" y="13" width="4" height="7" rx="0.6" />
+      <rect x="10" y="9" width="4" height="11" rx="0.6" />
+      <rect x="17" y="5" width="4" height="15" rx="0.6" />
     </Icon>
   );
 }
@@ -325,5 +324,198 @@ export function ArrowDownIcon(props) {
       <line x1="12" y1="5" x2="12" y2="19" />
       <polyline points="6 13 12 19 18 13" />
     </Icon>
+  );
+}
+
+/* ── Larger illustrative art for the secondary stat-card row ──
+   These are bigger, more detailed line drawings (not the small
+   circular KPI badges) meant to sit on the right side of a card,
+   the way the ASP / Cash Sales / Cash-vs-Total tiles look. ── */
+
+export function DropletLeafArt({ size = 56, ...rest }) {
+  return (
+    <svg
+      width={size} height={size} viewBox="0 0 64 64"
+      fill="none" xmlns="http://www.w3.org/2000/svg" {...rest}
+    >
+      {/* Main dropper bottle — elegant curves, semi-filled */}
+      <defs>
+        <linearGradient id="bottleGrad" x1="0%" y1="0%" x2="100%">
+          <stop offset="0%" stopColor="var(--secondary-brand)" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="var(--secondary-brand)" stopOpacity="0.04" />
+        </linearGradient>
+      </defs>
+      
+      {/* Bottle body */}
+      <path
+        d="M 28 12 L 24 18 Q 22 22 22 28 L 22 44 Q 22 48 26 48 L 38 48 Q 42 48 42 44 L 42 28 Q 42 22 40 18 L 36 12 Z"
+        fill="url(#bottleGrad)"
+        stroke="var(--secondary-brand)"
+        strokeWidth="1.2"
+      />
+      
+      {/* Bottle cap/dropper top */}
+      <rect x="28" y="6" width="8" height="6" rx="1.5" fill="var(--secondary-brand)" opacity="0.8" />
+      <circle cx="32" cy="5" r="1.5" fill="var(--secondary-brand)" />
+      
+      {/* Liquid fill line inside */}
+      <path
+        d="M 24 34 Q 24 32 26 32 L 38 32 Q 40 32 40 34"
+        stroke="var(--secondary-brand)"
+        strokeWidth="0.8"
+        opacity="0.4"
+      />
+      
+      {/* Left leaf — elegant curves */}
+      <path
+        d="M 12 36 Q 10 38 12 42 Q 14 40 14 36 Q 14 34 12 36 Z"
+        fill="var(--secondary-brand)"
+        opacity="0.6"
+      />
+      <path
+        d="M 12 36 Q 12 38 12 42"
+        stroke="var(--secondary-brand)"
+        strokeWidth="0.6"
+        opacity="0.4"
+      />
+      
+      {/* Right leaf — elegant curves */}
+      <path
+        d="M 52 36 Q 54 38 52 42 Q 50 40 50 36 Q 50 34 52 36 Z"
+        fill="var(--secondary-brand)"
+        opacity="0.6"
+      />
+      <path
+        d="M 52 36 Q 52 38 52 42"
+        stroke="var(--secondary-brand)"
+        strokeWidth="0.6"
+        opacity="0.4"
+      />
+      
+      {/* Small center leaf accent */}
+      <path
+        d="M 32 50 L 30 54 Q 32 55 34 54 Z"
+        fill="var(--secondary-brand)"
+        opacity="0.5"
+      />
+    </svg>
+  );
+}
+
+export function CashStackArt({ size = 56, ...rest }) {
+  return (
+    <svg
+      width={size} height={size} viewBox="0 0 64 64"
+      fill="none" xmlns="http://www.w3.org/2000/svg" {...rest}
+    >
+      <defs>
+        <linearGradient id="billGrad" x1="0%" y1="0%" x2="100%">
+          <stop offset="0%" stopColor="var(--champagne)" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="var(--champagne)" stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      
+      {/* Back bill (rotated) */}
+      <rect
+        x="8" y="28" width="30" height="16" rx="2.5"
+        fill="url(#billGrad)"
+        stroke="var(--champagne)"
+        strokeWidth="1"
+        opacity="0.6"
+        transform="rotate(-6 23 36)"
+      />
+      
+      {/* Middle bill */}
+      <rect
+        x="10" y="22" width="32" height="18" rx="2.5"
+        fill="url(#billGrad)"
+        stroke="var(--champagne)"
+        strokeWidth="1.1"
+        opacity="0.8"
+      />
+      
+      {/* Bill accent lines */}
+      <line x1="14" y1="22" x2="14" y2="40" stroke="var(--champagne)" strokeWidth="0.6" opacity="0.3" />
+      <line x1="38" y1="22" x2="38" y2="40" stroke="var(--champagne)" strokeWidth="0.6" opacity="0.3" />
+      <line x1="18" y1="31" x2="34" y2="31" stroke="var(--champagne)" strokeWidth="0.5" opacity="0.2" />
+      
+      {/* Coin stack on the right */}
+      <g transform="translate(42, 32)">
+        {/* Back coin */}
+        <ellipse cx="0" cy="-4" rx="8" ry="3.5" fill="var(--champagne)" opacity="0.5" />
+        <path
+          d="M -8 -4 Q -8 -2 0 0 Q 8 -2 8 -4"
+          fill="var(--champagne)"
+          opacity="0.6"
+        />
+        
+        {/* Middle coin */}
+        <ellipse cx="0" cy="0" rx="8.5" ry="4" fill="var(--champagne)" opacity="0.7" />
+        <path
+          d="M -8.5 0 Q -8.5 2 0 4.5 Q 8.5 2 8.5 0"
+          fill="var(--champagne)"
+          opacity="0.85"
+        />
+        
+        {/* Front coin */}
+        <ellipse cx="0" cy="4" rx="8" ry="3.5" fill="var(--champagne)" opacity="0.9" />
+        <path
+          d="M -8 4 Q -8 6 0 8 Q 8 6 8 4"
+          fill="var(--champagne)"
+          opacity="1"
+        />
+        
+        {/* Coin shine */}
+        <line x1="-4" y1="0" x2="4" y2="0" stroke="white" strokeWidth="0.5" opacity="0.4" />
+      </g>
+    </svg>
+  );
+}
+
+export function CashPieArt({ pct = 0, size = 56, ...rest }) {
+  const clamped = Math.max(0.001, Math.min(pct || 0, 99.999));
+  const r = 20, cx = 28, cy = 32;
+  const angle = (clamped / 100) * 360;
+  const toRad = (d) => ((d - 90) * Math.PI) / 180;
+  const sx = cx + r * Math.cos(toRad(0));
+  const sy = cy + r * Math.sin(toRad(0));
+  const ex = cx + r * Math.cos(toRad(angle));
+  const ey = cy + r * Math.sin(toRad(angle));
+  const largeArc = angle > 180 ? 1 : 0;
+  const slicePath = `M ${cx} ${cy} L ${sx} ${sy} A ${r} ${r} 0 ${largeArc} 1 ${ex} ${ey} Z`;
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" {...rest}>
+      <defs>
+        <linearGradient id="pieBg" x1="0%" y1="0%" x2="100%">
+          <stop offset="0%" stopColor="var(--sand)" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="var(--sand)" stopOpacity="0.08" />
+        </linearGradient>
+      </defs>
+      
+      {/* Background circle (the "empty" part) */}
+      <circle cx={cx} cy={cy} r={r} fill="url(#pieBg)" />
+      
+      {/* Filled slice (the actual percentage) */}
+      <path d={slicePath} fill="var(--accent)" opacity="0.85" />
+      
+      {/* Border/outline */}
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth="1.2" />
+      
+      {/* Subtle inner circle for depth */}
+      <circle cx={cx} cy={cy} r={r * 0.5} fill="none" stroke="var(--accent)" strokeWidth="0.5" opacity="0.2" />
+      
+      {/* Optional dollar sign accent in center (subtle) */}
+      <text
+        x={cx} y={cy + 4}
+        fontSize="10"
+        fontWeight="700"
+        textAnchor="middle"
+        fill="var(--accent)"
+        opacity="0.4"
+      >
+        $
+      </text>
+    </svg>
   );
 }

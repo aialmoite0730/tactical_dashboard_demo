@@ -713,20 +713,40 @@ html, body {
 .stat-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  gap: 12px;
 }
 
 .stat-card {
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px 20px;
+  padding: 16px 18px;
   box-shadow: var(--shadow);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 8px;
+  transition: box-shadow 0.15s, transform 0.15s;
 }
+.stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+
+/* Column variant — used by Cash vs Total, which needs a full-width
+   progress bar underneath the label/value/icon row */
+.stat-card--column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.stat-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Groups label/value/note as one flex item, so the icon art can sit
+   to the right of all three as a single sibling */
+.stat-card-body { display: flex; flex-direction: column; min-width: 0; }
 
 .stat-card-label {
   font-size: 10.5px;
@@ -734,7 +754,7 @@ html, body {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .stat-card-value {
@@ -747,26 +767,19 @@ html, body {
 .stat-card-note {
   font-size: 11.5px;
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: 3px;
 }
 
 .stat-card-art {
-  width: 56px;
-  height: 56px;
   flex-shrink: 0;
   color: var(--accent);
   opacity: 0.85;
-}
-
-.stat-card-progress {
-  flex: 1;
 }
 
 .stat-progress-track {
   background: var(--grid);
   border-radius: 6px;
   height: 6px;
-  margin-top: 10px;
   overflow: hidden;
 }
 .stat-progress-fill {
@@ -1015,7 +1028,7 @@ html, body {
 .day-subrow td {
   padding: 7px 22px 7px 46px;
   font-size: 11.5px;
-  color: var(--text-muted);
+  color: var(--text);
   background: var(--surface);
   border-bottom: 1px solid var(--grid);
   font-weight: 400;

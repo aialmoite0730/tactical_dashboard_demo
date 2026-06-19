@@ -5,9 +5,13 @@ import {
 } from "recharts";
 import {
   DollarIcon, TrendingUpIcon, CalendarIcon, ClockIcon, StarIcon,
-  DropletIcon, CashIcon, PieChartIcon, AlertTriangleIcon,
-  ArrowUpIcon, ArrowDownIcon, ChevronDownIcon,
+  AlertTriangleIcon, ArrowUpIcon, ArrowDownIcon, ChevronDownIcon,
+  CashPieArt,
 } from "../Icons";
+
+// Import the PNG images for ASP and Cash
+import dropperAspImg from "../assets/icon-asp-dropper.png";
+import cashStackImg from "../assets/icon-cash-stack.png";
 
 const DONUT_COLORS = [
   "var(--chart-cat-1)", "var(--chart-cat-2)", "var(--chart-cat-3)",
@@ -311,30 +315,45 @@ export default function Revenue({ apiBase, month, center, onData, aiInsights }) 
             <KpiCard icon={<ClockIcon size={17} />}      label="Rev / Hour"   value={summary?.rev_per_hour}/>
             <KpiCard icon={<StarIcon size={17} />}       label="30-Day ADV"   value={summary?.adv}/>
           </div>
-          {/* Row 2: NEW — ASP + Cash sales */}
-          <div className="kpi-row" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
-            <KpiCard
-              icon={<DropletIcon size={17} />}
-              label="Avg. Selling Price (ASP)"
-              value={summary?.asp}
-              note={`${summary?.invoice_count ?? 0} invoices`}
-              highlight
-            />
-            <KpiCard
-              icon={<CashIcon size={17} />}
-              label="Cash Sales MTD"
-              value={summary?.cash_sales}
-              note="payment_type = Cash"
-            />
-            <div className="kpi-card">
-              <div className="kpi-card-top">
-                <div className="kpi-icon"><PieChartIcon size={17} /></div>
-                <div className="kpi-label">Cash vs Total</div>
+          {/* Row 2: ASP + Cash sales — large illustrative art on the right,
+              matching the reference design (distinct from the small
+              circular badges used in the row above) */}
+          <div className="stat-row">
+            <div className="stat-card">
+              <div className="stat-card-body">
+                <div className="stat-card-label">Avg. Selling Price (ASP)</div>
+                <div className="stat-card-value"><AnimNum value={summary?.asp ?? 0} /></div>
+                <div className="stat-card-note">{summary?.invoice_count ?? 0} invoices</div>
               </div>
-              <div className="kpi-value">
-                {summary?.mtd_revenue > 0
-                  ? ((summary.cash_sales / summary.mtd_revenue) * 100).toFixed(1) + "%"
-                  : "—"}
+              <div className="stat-card-art"><img src={dropperAspImg} alt="ASP" style={{ width: 100, height: 100, objectFit: "contain" }} /></div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-card-body">
+                <div className="stat-card-label">Cash Sales MTD</div>
+                <div className="stat-card-value"><AnimNum value={summary?.cash_sales ?? 0} /></div>
+                <div className="stat-card-note">Payment Type: Cash</div>
+              </div>
+              <div className="stat-card-art"><img src={cashStackImg} alt="Cash" style={{ width: 100, height: 100, objectFit: "contain" }} /></div>
+            </div>
+
+            <div className="stat-card stat-card--column">
+              <div className="stat-card-top-row">
+                <div className="stat-card-body">
+                  <div className="stat-card-label">Cash vs Total</div>
+                  <div className="stat-card-value">
+                    {summary?.mtd_revenue > 0
+                      ? ((summary.cash_sales / summary.mtd_revenue) * 100).toFixed(1) + "%"
+                      : "—"}
+                  </div>
+                  <div className="stat-card-note">Cash sales as % of total revenue</div>
+                </div>
+                <div className="stat-card-art">
+                  <CashPieArt
+                    size={100}
+                    pct={summary?.mtd_revenue > 0 ? (summary.cash_sales / summary.mtd_revenue) * 100 : 0}
+                  />
+                </div>
               </div>
               <div className="stat-progress-track">
                 <div className="stat-progress-fill" style={{
