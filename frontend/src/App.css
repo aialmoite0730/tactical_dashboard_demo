@@ -45,16 +45,16 @@
   --chart-cat-5: #E1C89A; /* Body Contouring */
   --chart-cat-6: #A06369; /* Consults */
 
-  /* Semantic / performance (muted, not alarming) */
-  --positive:   #5F7D68;  /* Deep Sage */
+  /* Semantic / performance */
+  --positive:   #1E8E5A;  /* Green — good */
   --positive-bg:#EDF1EE;
-  --warning:    #B8915C;  /* Burnished Gold — needs attention */
+  --warning:    #C97A1E;  /* Amber — needs attention */
   --warning-bg: #F8F0E5;
-  --negative:   #A06369;  /* Dusty Merlot — critical */
+  --negative:   #D03A3A;  /* Red — critical */
   --negative-bg:#F4ECEC;
   --negative-border: #D9BBBE;
-  --wow-pos:    #5F7D68;
-  --wow-neg:    #A06369;
+  --wow-pos:    #1E8E5A;
+  --wow-neg:    #D03A3A;
 
   /* Sidebar */
   --sidebar-w:     232px;
@@ -990,8 +990,8 @@ html, body {
 .weekly-table tr:last-child td { border-bottom: none; }
 .weekly-table tbody tr:hover td { background: var(--surface); }
 
-.wow-pos  { color: var(--wow-pos); font-weight: 700; }
-.wow-neg  { color: var(--wow-neg); font-weight: 700; }
+.weekly-table .wow-pos  { color: var(--wow-pos); font-weight: 700; }
+.weekly-table .wow-neg  { color: var(--wow-neg); font-weight: 700; }
 .pace-row td { font-weight: 700; background: var(--surface); }
 
 /* Header cell holds an icon + title instead of a plain column label */
