@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000";
+const API_BASE = (process.env.REACT_APP_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 function currentMonth() {
   const now = new Date();
@@ -94,3 +94,4 @@ export function useDashboard({ month: monthProp, center = "All" } = {}) {
     refresh: load,
   };
 }
+

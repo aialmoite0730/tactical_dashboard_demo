@@ -7,7 +7,7 @@
  * Throws on non-2xx HTTP status so callers can catch errors uniformly.
  */
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000";
+const API_BASE = (process.env.REACT_APP_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 /**
  * Generic POST helper.
@@ -107,3 +107,4 @@ export async function fetchAppointmentCenters() {
   if (!res.ok) throw new Error("Failed to fetch appointment centers");
   return res.json();
 }
+

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 
-const API = process.env.REACT_APP_API_URL || "http://localhost:8000";
+const API = (process.env.REACT_APP_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 function currency(n) {
@@ -454,3 +454,4 @@ export default function AiInsights({ tab, data, loading, month, center }) {
     </div>
   );
 }
+

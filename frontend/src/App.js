@@ -12,7 +12,7 @@ import {
 // import Login from "./components/Login"; // disabled — uncomment with SSO gate
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000";
+const API_BASE = (process.env.REACT_APP_API_URL || "http://localhost:8000").replace(/\/$/, "");
 const MONTHS   = ["January","February","March","April","May","June",
                   "July","August","September","October","November","December"];
 const YEARS    = [2024, 2025, 2026];
@@ -266,3 +266,4 @@ export default function App() {
     </div>
   );
 }
+
