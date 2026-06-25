@@ -66,7 +66,11 @@ function Funnel({ f }) {
             <div className="mkt-stage-label">{s.label}</div>
             {s.rate && <div className="mkt-stage-rate">{s.rate}</div>}
           </div>
-          {i < stages.length - 1 && <div className="mkt-arrow">→</div>}
+          {i < stages.length - 1 && (
+            <div className="mkt-connector">
+              <div className="mkt-arrow">→</div>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -173,7 +177,7 @@ export default function Marketing({ apiBase, month, center, onData, aiInsights }
 
       {/* ── KPI cards ── */}
       {loading ? (
-        <div className="loading-row">
+        <div className="loading-row mkt-kpi-row">
           {[100, 90, 80, 70].map((w, i) => (
             <div key={i} className="kpi-card">
               <Skeleton h="10px" w="60%" mb="8px" /><Skeleton h="24px" w={`${w}%`} />
@@ -181,7 +185,7 @@ export default function Marketing({ apiBase, month, center, onData, aiInsights }
           ))}
         </div>
       ) : loaded && funnel ? (
-        <div className="kpi-row">
+        <div className="kpi-row mkt-kpi-row">
           <KpiCard icon={<DollarIcon size={17} />}     label="Cost of Acquisition (CAC)" value={funnel.cac}                sub="Ad Spend / New Clients" decimals={2} />
           <KpiCard icon={<RepeatIcon size={17} />}     label="Returning Clients"         value={funnel.returning_clients}  sub="Total returning clients" decimals={0} />
           <KpiCard icon={<StarIcon size={17} />}       label="Revenue per New Client"    value={funnel.rev_per_new_client} sub="New-client rev / new clients" decimals={2} />

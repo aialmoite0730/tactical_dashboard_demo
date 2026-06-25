@@ -294,7 +294,7 @@ html, body {
 .sidebar-brand-name {
   font-family: "Cormorant Garamond", "Inter", serif;
   font-size: 19px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--accent);
   letter-spacing: 0.08em;
 }
@@ -1247,6 +1247,30 @@ html, body {
 /* ============================================================
    MARKETING FUNNEL — tab-specific styles (namespaced .mkt-)
    ============================================================ */
+.mkt-kpi-row {
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--surface-2);
+  border: 1.5px solid var(--secondary-brand);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+
+.mkt-kpi-row .kpi-card {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  border-radius: 0;
+}
+.mkt-kpi-row .kpi-card:hover {
+  box-shadow: none;
+  transform: none;
+}
+.mkt-kpi-row .kpi-card + .kpi-card {
+  border-left: 1px solid var(--border);
+  padding-left: 14px;
+}
+
 .mkt-note {
   font-size: 12px;
   color: var(--text-muted);
@@ -1267,48 +1291,51 @@ html, body {
 
 .mkt-funnel-row {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   flex: 1;
 }
 
 .mkt-stage {
   flex: 1;
   min-height: 230px;
-  color: #fff;
+  color: var(--text);
   text-align: center;
   padding: 28px 14px 20px;
   position: relative;
-  border-radius: 6px;
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1.5px solid var(--secondary-brand);
+  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.mkt-stage:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
-.mkt-stage--blue   { background: linear-gradient(135deg, #1f73b8, #1559a0); }
-.mkt-stage--teal   { background: linear-gradient(135deg, #12a3ab, #0a8f9c); }
-.mkt-stage--green  { background: linear-gradient(135deg, #4caf50, #3c9f4a); }
-.mkt-stage--purple { background: linear-gradient(135deg, #6d4bb5, #5a3da3); }
-
 .mkt-stage-title {
-  font-size: 14px;
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   margin-bottom: 18px;
   text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .mkt-stage-icon {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--accent-soft);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 18px;
-  color: #fff;
+  color: var(--accent);
 }
 
 .mkt-stage-value {
@@ -1320,37 +1347,43 @@ html, body {
 .mkt-stage-label {
   font-size: 14px;
   font-weight: 500;
-  opacity: 0.9;
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
 .mkt-stage-rate {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.18);
-  padding: 2px 7px;
-  border-radius: 6px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-top: 10px;
+}
+
+.mkt-connector {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 -14px;
+  z-index: 3;
 }
 
 .mkt-arrow {
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  margin: 0 -20px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--accent-soft);
   color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-  z-index: 3;
+  box-shadow: var(--shadow);
 }
 
 .mkt-table-grid {
@@ -1412,6 +1445,9 @@ html, body {
 @media (max-width: 900px) {
   .mkt-funnel       { flex-direction: column; gap: 14px; }
   .mkt-funnel-row   { flex-direction: column; width: 100%; }
-  .mkt-arrow        { transform: rotate(90deg); padding: 4px 0; }
+  .mkt-connector    { margin: -8px 0; flex-direction: row; }
+  .mkt-arrow        { transform: rotate(90deg); }
   .mkt-table-grid   { grid-template-columns: 1fr; }
+  .mkt-kpi-row      { grid-template-columns: repeat(2, 1fr); }
+  .mkt-kpi-row .kpi-card + .kpi-card { border-left: none; padding-left: 0; }
 }
