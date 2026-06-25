@@ -52,9 +52,9 @@ client = bigquery.Client()
 
 # ─── Table references ─────────────────────────────────────────────────────────
 def get_sales_table() -> str:
-    project = os.getenv("BIGQUERY_PROJECT_ID", "your-project")
-    dataset = os.getenv("BIGQUERY_DATASET",    "your_dataset")
-    table   = os.getenv("BIGQUERY_TABLE",      "sales_accrual")
+    project = os.getenv("BIGQUERY_PROJECT_ID")
+    dataset = os.getenv("BIGQUERY_DATASET")
+    table   = os.getenv("BIGQUERY_TABLE")
     return f"`{project}.{dataset}.{table}`"
 
 
@@ -68,7 +68,14 @@ def get_appt_table() -> str:
 def get_schedule_table() -> str:
     project = os.getenv("BIGQUERY_PROJECT_ID")
     dataset = os.getenv("BIGQUERY_DATASET")
-    table   = os.getenv("BIGQUERY_SCHEDULE_TABLE", "employee_schedule")
+    table   = os.getenv("BIGQUERY_SCHEDULE_TABLE")
+    return f"`{project}.{dataset}.{table}`"
+
+
+def get_marketing_table() -> str:
+    project = os.getenv("BIGQUERY_PROJECT_ID")
+    dataset = os.getenv("BIGQUERY_DATASET")
+    table   = os.getenv("BIGQUERY_MARKETING_TABLE")
     return f"`{project}.{dataset}.{table}`"
 
 

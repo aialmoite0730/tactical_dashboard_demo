@@ -4,9 +4,10 @@ import Revenue      from "./components/Revenue";
 import Leaderboard  from "./components/Leaderboard";
 import Appointments from "./components/Appointments";
 import Utilization  from "./components/Utilization";
+import Marketing    from "./components/Marketing";
 import AiInsights   from "./components/AiInsights";
 import {
-  ChartBarIcon, TrophyIcon, AppointmentsIcon, ClockIcon,
+  ChartBarIcon, TrophyIcon, AppointmentsIcon, ClockIcon, ZapIcon,
   PinIcon, CalendarIcon, HeadsetIcon, ChevronDownIcon, InfoIcon,
 } from "./Icons";
 // import Login from "./components/Login"; // disabled — uncomment with SSO gate
@@ -21,6 +22,7 @@ const TABS = [
   { id: "leaderboard",  label: "Leaderboard",  icon: TrophyIcon },
   { id: "appointments", label: "Appointments", icon: AppointmentsIcon },
   { id: "utilization",  label: "Utilization",  icon: ClockIcon },
+  { id: "marketing",    label: "Marketing",    icon: ZapIcon },
 ];
 
 // Tab → page title + subtitle shown in the topbar
@@ -29,6 +31,7 @@ const TAB_META = {
   leaderboard:  { title: "Staff Leaderboard",     sub: "Staff revenue rankings, servicer breakdown, and referral sources." },
   appointments: { title: "Appointments",          sub: "Appointment volume, status breakdown, and rebook rates." },
   utilization:  { title: "Provider Utilization",  sub: "Utilization rates and revenue per hour by provider and role." },
+  marketing:    { title: "Marketing Funnel",       sub: "Ad Spend → Clicks → New Clients → Revenue from New Clients." },
 };
 
 function monthStr(monthName, year) {
@@ -262,6 +265,7 @@ export default function App() {
         {tab === "leaderboard"  && <Leaderboard  key={`lb-${refreshKey}`}   apiBase={API_BASE} month={month} center={center} onData={handlePanelData} aiInsights={() => renderAiInsights("leaderboard")}  />}
         {tab === "appointments" && <Appointments key={`appt-${refreshKey}`} apiBase={API_BASE} month={month} center={center} onData={handlePanelData} aiInsights={() => renderAiInsights("appointments")} />}
         {tab === "utilization"  && <Utilization  key={`util-${refreshKey}`} apiBase={API_BASE} month={month} center={center} onData={handlePanelData} aiInsights={() => renderAiInsights("utilization")}  />}
+        {tab === "marketing"    && <Marketing    key={`mkt-${refreshKey}`}  apiBase={API_BASE} month={month} center={center} onData={handlePanelData} aiInsights={() => renderAiInsights("marketing")}    />}
       </div>
     </div>
   );

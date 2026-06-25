@@ -9,6 +9,7 @@ Router map:
   /api/leaderboard         → routers/leaderboard.py
   /api/appointments        → routers/appointments.py
   /api/utilization         → routers/utilization.py
+  /api/marketing           → routers/marketing.py
   /api/insights            → routers/insights.py
 """
 
@@ -33,6 +34,7 @@ from routers.revenue      import router as revenue_router
 from routers.leaderboard  import router as leaderboard_router
 from routers.appointments import router as appointments_router
 from routers.utilization  import router as utilization_router
+from routers.marketing    import router as marketing_router
 from routers.insights     import router as insights_router
 
 app = FastAPI(title="Tactical Dashboard API", version="2.0.0")
@@ -50,6 +52,7 @@ app.include_router(revenue_router)
 app.include_router(leaderboard_router)
 app.include_router(appointments_router)
 app.include_router(utilization_router)
+app.include_router(marketing_router)
 app.include_router(insights_router)
 
 

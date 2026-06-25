@@ -243,11 +243,51 @@ function buildUtilizationPrompt(data, month, center) {
   );
 }
 
+// Marketing — data: { funnel, sources }
+// funnel shape:  { ad_spend, clicks, new_clients, returning_clients,
+//                  new_client_revenue, cac, rev_per_new_client, roas,
+//                  click_rate, new_client_rate, revenue_vs_spend }
+// sources shape: [{ source, ad_spend, pct_total_spend }]
+function buildMarketingPrompt(data, month, center) {
+  const f = data.funnel || {};
+
+  const summaryBlock =
+    `Ad Spend: ${currency(f.ad_spend)}\n` +
+    `Clicks: ${num(f.clicks)}\n` +
+    `New Clients: ${num(f.new_clients)}\n` +
+    `Returning Clients: ${num(f.returning_clients)}\n` +
+    `New-Client Revenue: ${currency(f.new_client_revenue)}\n` +
+    `CAC (ad spend ÷ new clients): ${currency(f.cac)}\n` +
+    `Revenue per New Client: ${currency(f.rev_per_new_client)}\n` +
+    `ROAS (new-client rev ÷ ad spend): ${f.roas != null ? Number(f.roas).toFixed(2) : "N/A"}\n` +
+    `Click Rate (clicks ÷ ad spend): ${pct((f.click_rate || 0) * 100)}\n` +
+    `New-Client Rate (new clients ÷ clicks): ${pct((f.new_client_rate || 0) * 100)}`;
+
+  const srcBlock = (data.sources || []).length > 0
+    ? data.sources.slice(0, 8).map(r =>
+        `  ${r.source}: ${currency(r.ad_spend)} (${pct((r.pct_total_spend || 0) * 100)} of total spend)`
+      ).join("\n")
+    : "  No spend-by-source data.";
+
+  return (
+    `You are a senior marketing analyst. Analyze ONLY the dashboard data below. ` +
+    `Write 4-6 specific, data-backed insights.\n\n` +
+    GROUNDING_RULES + `\n` +
+    `Period: ${month}${center && center !== "All" ? ` · Center: ${center}` : " · All Centers"}\n` +
+    `NOTE: Ad spend is account-wide (no center split); new clients and revenue are center-filtered.\n\n` +
+    `MARKETING FUNNEL:\n${summaryBlock}\n\n` +
+    `SPEND BY SOURCE (top 8):\n${srcBlock}\n\n` +
+    `Focus on ROAS vs. CAC, which sources absorb the most spend, ` +
+    `the click→new-client conversion, and whether new-client revenue justifies the spend.`
+  );
+}
+
 function buildPrompt(tab, data, month, center) {
   if (tab === "revenue")      return buildRevenuePrompt(data, month, center);
   if (tab === "leaderboard")  return buildLeaderboardPrompt(data, month, center);
   if (tab === "appointments") return buildAppointmentsPrompt(data, month, center);
   if (tab === "utilization")  return buildUtilizationPrompt(data, month, center);
+  if (tab === "marketing")    return buildMarketingPrompt(data, month, center);
   return "No data available for this view.";
 }
 
@@ -368,6 +408,7 @@ export default function AiInsights({ tab, data, loading, month, center }) {
     leaderboard:  "Leaderboard",
     appointments: "Appointments",
     utilization:  "Utilization",
+    marketing:    "Marketing",
   };
 
   return (
