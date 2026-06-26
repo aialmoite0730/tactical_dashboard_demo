@@ -1,6 +1,6 @@
 # Evolve Med Spa — Tactical Dashboard
 
-A full-stack tactical dashboard for revenue, leaderboard, appointment, and utilization analytics, powered by BigQuery and optionally enriched with AI-generated insights (OpenAI / Gemini).
+A full-stack tactical dashboard for revenue, leaderboard, appointment, utilization, and marketing analytics, powered by BigQuery and optionally enriched with AI-generated insights (OpenAI / Gemini).
 
 ---
 
@@ -23,6 +23,7 @@ evolve_spa_dashboard/
 │   │   ├── leaderboard.py         # POST /api/leaderboard
 │   │   ├── appointments.py        # POST /api/appointments
 │   │   ├── utilization.py         # POST /api/utilization
+│   │   ├── marketing.py           # POST /api/marketing
 │   │   └── insights.py            # POST /api/insights  (AI: OpenAI → Gemini fallback)
 │   └── utils/
 │       └── errors.py              # Centralised error_response() helper
@@ -40,6 +41,7 @@ evolve_spa_dashboard/
         │   ├── Leaderboard.jsx    # Staff ranking, servicer table, referrals
         │   ├── Appointments.jsx   # Appointment KPIs, status, category, provider charts
         │   ├── Utilization.jsx    # Provider util %, revenue/hr, role summary
+        │   ├── Marketing.jsx      # Marketing funnel, spend line chart, source pie chart, KPIs
         │   └── AiInsights.jsx     # AI panel — auto-generates on tab/filter change
         ├── hooks/
         │   └── useDashboard.js    # Optional hook for revenue data (legacy-compatible)
@@ -58,6 +60,7 @@ evolve_spa_dashboard/
 | **Leaderboard** | Staff ranking with **ASP per staff**, servicer table with **ASP column**, referral source bars |
 | **Appointments** | Total, closed, no-show rate, cancel rate, **rebook rate (rebooked ÷ closed)**, first-visit rate, utilisation %, add-ons, category/provider/booking source/hourly charts |
 | **Utilization** | Provider util % (booked ÷ scheduled), **revenue/utilized hour** (sales ÷ booked hrs joined on serviced_by + date + center), role summary table |
+| **Marketing** | Marketing funnel (ad spend → clicks → new clients → revenue), spend-by-date line chart (per source), spend-by-source pie chart, CAC, ROAS, returning clients, rev per new client, source table, funnel performance table. Ad spend is divided by 4 for display. |
 | **AI Insights** | Auto-generates on every tab/filter change after the first load; manual ↻ Regenerate button; OpenAI primary, Gemini fallback |
 
 ### Key metric corrections vs. original code
@@ -117,12 +120,12 @@ Set `REACT_APP_API_URL=http://localhost:8000` in `frontend/.env` or `frontend/.e
 | `BIGQUERY_TABLE` | ✅ | Sales accrual table (default: `sales_accrual`) |
 | `BIGQUERY_APPT_TABLE` | ✅ | Appointments table |
 | `BIGQUERY_SCHEDULE_TABLE` | ✅ | Employee schedule table (default: `employee_schedule`) |
+| `BIGQUERY_MARKETING_TABLE` | ✅ | Marketing/ad spend table |
 | `GOOGLE_APPLICATION_CREDENTIALS` | ✅ local | Path to service account JSON |
 | `BIGQUERY_CREDENTIALS_BASE64` | ✅ deploy | Base64-encoded service account JSON |
 | `MONTHLY_GOAL` | optional | Numeric revenue goal (e.g. `150000`) |
 | `OPENAI_API_KEY` | optional | Primary AI provider for insights |
 | `GEMINI_API_KEY` | optional | Fallback AI provider for insights |
-| `AI_INSIGHTS_DEBUG` | optional | Set to `0` to silence insights debug logs (default `1`) |
 | `PORT` | optional | Backend port (default `8000`) |
 
 > ⚠️ Never commit `.env`, `bigquery_service_account.json`, or any key files.
@@ -192,6 +195,17 @@ Body: `{ action, month, center }`
 | `role_summary` | `{ data: [{role, headcount, scheduled_hours, booked_hours, revenue, utilization_pct, rev_per_hour}] }` |
 | `daily_utilization` | `{ data: [{date, center, scheduled_hours, booked_hours, utilization_pct}] }` |
 
+### Marketing — `POST /api/marketing`
+Body: `{ action, month, center }`
+
+| action | Returns |
+|---|---|
+| `funnel` | `{ ad_spend, clicks, new_clients, returning_clients, new_client_revenue, cac, rev_per_new_client, roas, click_rate, new_client_rate, revenue_vs_spend }` |
+| `by_source` | `{ data: [{source, ad_spend, pct_total_spend}] }` |
+| `daily_by_source` | `{ data: [{date, source, ad_spend}] }` |
+
+> **Note:** The marketing table has no center column. Ad spend and clicks are account-wide; the center filter applies only to clients and revenue stages.
+
 ### AI Insights — `POST /api/insights`
 Body: `{ tab, prompt, month, center }`  
 Returns: `{ insight: string, provider: "openai" | "gemini" }`
@@ -219,6 +233,7 @@ Panel (e.g. Revenue.jsx)
 | Leaderboard | `staff`, `serviceTypes`, `referrals` |
 | Appointments | `summary`, `byStatus`, `byCategory`, `byProvider`, `byBookingSource` |
 | Utilization | `providers`, `revPerHour`, `roleSummary` |
+| Marketing | `funnel`, `sources` |
 
 ---
 

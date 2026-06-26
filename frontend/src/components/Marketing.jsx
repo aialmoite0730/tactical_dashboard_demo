@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
+  LineChart, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid, Legend,
+  PieChart, Pie, Cell,
+} from "recharts";
+import {
   DollarIcon, ZapIcon, UserPlusIcon, TrendingUpIcon, ChartBarIcon,
   RepeatIcon, StarIcon, AlertTriangleIcon,
 } from "../Icons";
@@ -49,10 +54,11 @@ function Skeleton({ h = "18px", w = "100%", mb = "0" }) {
 
 // ── Funnel (4 stages) ──────────────────────────────────────────────────────────
 function Funnel({ f }) {
+  const cpc = f.clicks ? f.ad_spend / f.clicks : 0;
   const stages = [
-    { key: "blue",   title: "1. AD SPEND",            icon: <DollarIcon size={26} />,    value: amt(f.ad_spend),          label: "Total Spend",  rate: pct(f.click_rate) },
+    { key: "blue",   title: "1. AD SPEND",            icon: <DollarIcon size={26} />,    value: amt(f.ad_spend),          label: "Total Spend",  rate: `Cost/Click: ${amt(cpc)}` },
     { key: "teal",   title: "2. CLICKS",              icon: <ZapIcon size={26} />,       value: int(f.clicks),            label: "Total Clicks", rate: pct(f.new_client_rate) },
-    { key: "green",  title: "3. NEW CLIENTS",         icon: <UserPlusIcon size={26} />,  value: int(f.new_clients),       label: "New Clients",  rate: amt(f.rev_per_new_client) },
+    { key: "green",  title: "3. NEW CLIENTS",         icon: <UserPlusIcon size={26} />,  value: int(f.new_clients),       label: "New Clients",  rate: `Rev/Client: ${amt(f.rev_per_new_client)}` },
     { key: "purple", title: "4. REVENUE FROM NEW CLIENTS", icon: <ChartBarIcon size={26} />, value: amt(f.new_client_revenue), label: "Revenue",   rate: null },
   ];
   return (
@@ -77,7 +83,117 @@ function Funnel({ f }) {
   );
 }
 
-// ── Spend-by-source table ────────────────────────────────────────────────────
+// ── Chart constants ───────────────────────────────────────────────────────────
+const SOURCE_COLORS = {
+  facebook:            "#1877F2",
+  google:              "#34A853",
+  google_my_business:  "#FBBC05",
+  instagram:           "#E4405F",
+  klaviyo:             "#2D2D2D",
+  tiktok:              "#69C9D0",
+  Unknown:             "#999999",
+};
+const PIE_COLORS = [
+  "var(--chart-cat-1)", "var(--chart-cat-2)", "var(--chart-cat-3)",
+  "var(--chart-cat-4)", "var(--chart-cat-5)", "var(--chart-cat-6)",
+  "var(--secondary-brand)", "var(--accent-bar)",
+];
+
+function fmtDate(s) {
+  if (!s) return "";
+  const d = new Date(s + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+function fmtAxisY(v) { return `${(v / 1000).toFixed(0)}K`; }
+
+// ── Spend by Date and Source (line chart) ─────────────────────────────────────
+function SpendLineChart({ data }) {
+  if (!data?.length) return <div className="chart-empty">No daily spend data</div>;
+
+  const sources = [...new Set(data.map(d => d.source))].sort();
+  const byDate = {};
+  data.forEach(r => {
+    if (!byDate[r.date]) byDate[r.date] = { date: r.date };
+    byDate[r.date][r.source] = r.ad_spend;
+  });
+  const chartData = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+
+  return (
+    <div className="chart-card" style={{ flex: 2 }}>
+      <div className="chart-title">SPEND by Date and SOURCE</div>
+      <ResponsiveContainer width="100%" height={260}>
+        <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--grid)" vertical={false} />
+          <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 9, fill: "var(--text-muted)" }} tickLine={false} axisLine={false} interval={2} />
+          <YAxis tickFormatter={fmtAxisY} tick={{ fontSize: 9, fill: "var(--text-muted)" }} tickLine={false} axisLine={false} width={44} />
+          <Tooltip
+            labelFormatter={fmtDate}
+            formatter={(v) => [amt(v), undefined]}
+            contentStyle={{ fontSize: 11, background: "var(--card-bg)", border: "1px solid var(--border)" }}
+          />
+          <Legend wrapperStyle={{ fontSize: 10 }} />
+          {sources.map(src => (
+            <Line
+              key={src}
+              type="monotone"
+              dataKey={src}
+              name={src}
+              stroke={SOURCE_COLORS[src] || "#888"}
+              strokeWidth={2}
+              dot={false}
+              connectNulls
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ── Spend by Source (pie chart — clean donut, no center label) ───────────────
+function SourcePieChart({ rows, total }) {
+  if (!rows?.length) return <div className="chart-empty">No spend data</div>;
+  return (
+    <div className="chart-card" style={{ flex: 1 }}>
+      <div className="chart-title">Spend by Source</div>
+      <ResponsiveContainer width="100%" height={200}>
+        <PieChart>
+          <Pie
+            data={rows}
+            cx="50%"
+            cy="50%"
+            innerRadius={50}
+            outerRadius={80}
+            dataKey="ad_spend"
+            nameKey="source"
+            paddingAngle={2}
+          >
+            {rows.map((entry, i) => (
+              <Cell key={entry.source} fill={SOURCE_COLORS[entry.source] || PIE_COLORS[i % PIE_COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(v, n) => [amt(v), n]} />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="cat-legend">
+        {rows.map((d, i) => (
+          <div key={d.source} className="cat-legend-item">
+            <span className="cat-dot" style={{ background: SOURCE_COLORS[d.source] || PIE_COLORS[i % PIE_COLORS.length] }} />
+            <span className="cat-name">{d.source}</span>
+            <span className="cat-pct">{pct1(d.pct_total_spend)}</span>
+          </div>
+        ))}
+      </div>
+      {total > 0 && (
+        <div style={{ textAlign: "center", fontSize: 10, color: "var(--text-muted)", marginTop: 6 }}>
+          Total: {amt(total)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Spend-by-source table (kept as fallback) ─────────────────────────────────
 function SourceTable({ rows, total }) {
   if (!rows?.length) return <div className="chart-empty">No spend data</div>;
   return (
@@ -106,18 +222,24 @@ function SourceTable({ rows, total }) {
 
 // ── Funnel-performance table ─────────────────────────────────────────────────
 function FunnelTable({ f }) {
+  const clicksPerDollar = f.ad_spend ? f.clicks / f.ad_spend : 0;
+  const clientsPerClick = f.clicks ? f.new_clients / f.clicks : 0;
+  const revPerClient    = f.new_clients ? f.new_client_revenue / f.new_clients : 0;
+  const clientsPerDollar = f.ad_spend ? f.new_clients / f.ad_spend : 0;
+  const revenueVsSpend   = f.ad_spend ? f.new_client_revenue / f.ad_spend : 0;
+
   return (
     <div className="mkt-box">
       <h3>Funnel Performance Overview</h3>
       <table className="mkt-table">
         <thead>
-          <tr><th>Stage</th><th>Count / Amount</th><th>% of Previous</th><th>% of Ad Spend</th></tr>
+          <tr><th>Stage</th><th>Count / Amount</th><th>Conversion Rate</th><th>% of Ad Spend</th></tr>
         </thead>
         <tbody>
           <tr><td>Ad Spend</td><td>{amt(f.ad_spend)}</td><td>–</td><td>100.00%</td></tr>
-          <tr><td>Clicks</td><td>{int(f.clicks)}</td><td>{pct(f.click_rate)}</td><td>{pct(f.click_rate)}</td></tr>
-          <tr><td>New Clients</td><td>{int(f.new_clients)}</td><td>{pct(f.new_client_rate)}</td><td>{pct(f.ad_spend ? f.new_clients / f.ad_spend : 0)}</td></tr>
-          <tr><td>Revenue from New Clients</td><td>{amt(f.new_client_revenue)}</td><td>{pct(f.rev_per_new_client)}</td><td>{pct(f.revenue_vs_spend)}</td></tr>
+          <tr><td>Clicks</td><td>{int(f.clicks)}</td><td>{amt(clicksPerDollar)} per $</td><td>–</td></tr>
+          <tr><td>New Clients</td><td>{int(f.new_clients)}</td><td>{pct(clientsPerClick)}</td><td>{pct(clientsPerDollar)}</td></tr>
+          <tr><td>Revenue from New Clients</td><td>{amt(f.new_client_revenue)}</td><td>{amt(revPerClient)} per client</td><td>{pct(revenueVsSpend)}</td></tr>
         </tbody>
       </table>
     </div>
@@ -125,11 +247,12 @@ function FunnelTable({ f }) {
 }
 
 export default function Marketing({ apiBase, month, center, onData, aiInsights }) {
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
-  const [funnel,  setFunnel]  = useState(null);
-  const [sources, setSources] = useState([]);
-  const [loaded,  setLoaded]  = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState("");
+  const [funnel,        setFunnel]        = useState(null);
+  const [sources,       setSources]       = useState([]);
+  const [dailyBySource, setDailyBySource] = useState([]);
+  const [loaded,        setLoaded]        = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(""); setLoaded(false);
@@ -140,12 +263,33 @@ export default function Marketing({ apiBase, month, center, onData, aiInsights }
         body: JSON.stringify({ action, month, center }),
       }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
 
-      const [f, s] = await Promise.all([post("funnel"), post("by_source")]);
+      const [f, s, d] = await Promise.all([
+        post("funnel"), post("by_source"), post("daily_by_source"),
+      ]);
       if (f.error) throw new Error(f.error);
+
+      // Ad spend ÷ 4
+      f.ad_spend = (f.ad_spend || 0) / 4;
+      f.cac = f.new_clients ? f.ad_spend / f.new_clients : 0;
+      f.roas = f.ad_spend ? f.new_client_revenue / f.ad_spend : 0;
+      f.click_rate = f.ad_spend ? f.clicks / f.ad_spend : 0;
+      f.revenue_vs_spend = f.ad_spend ? f.new_client_revenue / f.ad_spend : 0;
+
+      const srcData = (s.data || []).map(r => ({
+        ...r,
+        ad_spend: (r.ad_spend || 0) / 4,
+      }));
+
+      const dailyData = (d.data || []).map(r => ({
+        ...r,
+        ad_spend: (r.ad_spend || 0) / 4,
+      }));
+
       setFunnel(f);
-      setSources(s.data || []);
+      setSources(srcData);
+      setDailyBySource(dailyData);
       setLoaded(true);
-      onData?.({ funnel: f, sources: s.data || [] }, false);
+      onData?.({ funnel: f, sources: srcData }, false);
     } catch (e) {
       setError(e.message || "Failed to load data");
       onData?.({}, false);
@@ -196,7 +340,20 @@ export default function Marketing({ apiBase, month, center, onData, aiInsights }
       {/* ── AI Insights ── */}
       {loaded && aiInsights && aiInsights()}
 
-      {/* ── Tables ── */}
+      {/* ── Line Chart + Pie Chart ── */}
+      {loading ? (
+        <div className="loading-chart-row">
+          <div className="chart-card"><Skeleton h="260px" /></div>
+          <div className="chart-card"><Skeleton h="260px" /></div>
+        </div>
+      ) : loaded ? (
+        <div className="charts-row">
+          <SpendLineChart data={dailyBySource} />
+          <SourcePieChart rows={sources} total={totalSpend} />
+        </div>
+      ) : null}
+
+      {/* ── Tables: Spend by Source + Funnel Performance ── */}
       {loading ? (
         <div className="loading-chart-row">
           <div className="chart-card"><Skeleton h="180px" /></div>

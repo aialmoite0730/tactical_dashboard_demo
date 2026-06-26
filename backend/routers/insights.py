@@ -26,8 +26,6 @@ from utils.errors import error_response
 
 router = APIRouter(tags=["AI Insights"])
 
-_ENV = os.getenv("APP_ENV", "production")
-
 # ─── AI provider config ────────────────────────────────────────────────────────
 OPENAI_URL   = "https://api.openai.com/v1/chat/completions"
 OPENAI_MODEL = "gpt-4o-mini"
@@ -37,21 +35,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 AI_TIMEOUT_SECONDS = 30.0
-
-# ─── Debug logging ─────────────────────────────────────────────────────────────
-# Set AI_INSIGHTS_DEBUG=0 to silence. On by default — easy to misconfigure.
-DEBUG = os.getenv("AI_INSIGHTS_DEBUG", "1") != "0"
-
-
-def _debug(msg: str) -> None:
-    if DEBUG:
-        print(f"🔍 [insights] {msg}")
-
-
-_debug(
-    f"startup — OPENAI_API_KEY={'set (' + OPENAI_API_KEY[:4] + '...)' if OPENAI_API_KEY else 'NOT SET'}, "
-    f"GEMINI_API_KEY={'set (' + GEMINI_API_KEY[:4] + '...)' if GEMINI_API_KEY else 'NOT SET'}"
-)
 
 
 # ─── Request model ─────────────────────────────────────────────────────────────
@@ -64,7 +47,6 @@ class InsightRequest(BaseModel):
 
 # ─── AI provider calls ─────────────────────────────────────────────────────────
 async def _call_openai(prompt: str) -> str:
-    _debug(f"calling OpenAI ({OPENAI_MODEL}) — prompt length={len(prompt)} chars")
     async with httpx.AsyncClient(timeout=AI_TIMEOUT_SECONDS) as client:
         res = await client.post(
             OPENAI_URL,
@@ -80,23 +62,19 @@ async def _call_openai(prompt: str) -> str:
             },
         )
 
-    _debug(f"OpenAI responded with HTTP {res.status_code}")
     if res.status_code != 200:
         try:    err = res.json()
         except: err = {}
-        _debug(f"OpenAI error body: {err}")
         if res.status_code == 429:
             raise RuntimeError("OpenAI rate limit reached.")
         raise RuntimeError(err.get("error", {}).get("message") or f"OpenAI HTTP {res.status_code}")
 
     data = res.json()
     text = (data.get("choices", [{}])[0].get("message", {}).get("content") or "").strip()
-    _debug(f"OpenAI returned {len(text)} chars")
     return text
 
 
 async def _call_gemini(prompt: str) -> str:
-    _debug(f"calling Gemini (fallback) — prompt length={len(prompt)} chars")
     async with httpx.AsyncClient(timeout=AI_TIMEOUT_SECONDS) as client:
         res = await client.post(
             GEMINI_URL,
@@ -110,11 +88,9 @@ async def _call_gemini(prompt: str) -> str:
             },
         )
 
-    _debug(f"Gemini responded with HTTP {res.status_code}")
     if res.status_code != 200:
         try:    err = res.json()
         except: err = {}
-        _debug(f"Gemini error body: {err}")
         if res.status_code == 429:
             raise RuntimeError("Gemini rate limit reached.")
         raise RuntimeError(err.get("error", {}).get("message") or f"Gemini HTTP {res.status_code}")
@@ -122,7 +98,6 @@ async def _call_gemini(prompt: str) -> str:
     data  = res.json()
     parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])
     text  = (parts[0].get("text") or "").strip()
-    _debug(f"Gemini returned {len(text)} chars")
     return text
 
 
@@ -133,11 +108,6 @@ async def get_insight(payload: InsightRequest, request: Request):
     Returns: { "insight": str, "provider": "openai" | "gemini" }
     """
     try:
-        _debug(
-            f"request received — tab={payload.tab}, month={payload.month}, "
-            f"center={payload.center}, prompt_length={len(payload.prompt)}"
-        )
-
         if not OPENAI_API_KEY and not GEMINI_API_KEY:
             raise RuntimeError(
                 "No AI provider configured on the server "
@@ -154,10 +124,7 @@ async def get_insight(payload: InsightRequest, request: Request):
                 text     = await _call_openai(payload.prompt)
                 provider = "openai"
             except Exception as exc:
-                _debug(f"OpenAI FAILED: {exc!r}")
                 last_err = exc
-        else:
-            _debug("OPENAI_API_KEY not set — skipping primary provider")
 
         # Gemini fallback
         if not text and GEMINI_API_KEY:
@@ -166,18 +133,12 @@ async def get_insight(payload: InsightRequest, request: Request):
                 provider = "gemini"
                 last_err = None
             except Exception as exc:
-                _debug(f"Gemini FAILED: {exc!r}")
                 last_err = exc
-        elif not text:
-            _debug("GEMINI_API_KEY not set — no fallback available")
 
         if not text:
-            _debug(f"both providers failed — raising: {last_err!r}")
             raise last_err or RuntimeError("AI provider returned an empty response.")
 
-        _debug(f"success via {provider} — insight length={len(text)} chars")
         return {"insight": text, "provider": provider}
 
     except Exception as exc:
-        _debug(f"request FAILED: {exc!r}")
         return error_response(exc)

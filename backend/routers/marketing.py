@@ -147,6 +147,30 @@ async def marketing(request: Request):
                 ]
             }
 
+        # ── DAILY BY SOURCE (line chart) ─────────────────────────────────────
+        elif action == "daily_by_source":
+            q = f"""
+                SELECT
+                    DATE(date) AS date,
+                    COALESCE(NULLIF(TRIM(source), ''), 'Unknown') AS source,
+                    COALESCE(SUM(spend), 0) AS ad_spend
+                FROM {mkt_tbl}
+                WHERE {SPEND_WHERE}
+                GROUP BY date, source
+                ORDER BY date, source
+            """
+            rows = await run_query_async(q)
+            return {
+                "data": [
+                    {
+                        "date":     str(r.date),
+                        "source":   r.source,
+                        "ad_spend": to_float(r.ad_spend),
+                    }
+                    for r in rows
+                ]
+            }
+
         else:
             return {"error": f"Unknown action: {action}"}
 
