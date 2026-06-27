@@ -1249,26 +1249,6 @@ html, body {
    ============================================================ */
 .mkt-kpi-row {
   grid-template-columns: repeat(4, 1fr);
-  background: var(--surface-2);
-  border: 1.5px solid var(--secondary-brand);
-  border-radius: var(--radius);
-  padding: 14px;
-  box-shadow: var(--shadow);
-}
-
-.mkt-kpi-row .kpi-card {
-  border: none;
-  box-shadow: none;
-  background: transparent;
-  border-radius: 0;
-}
-.mkt-kpi-row .kpi-card:hover {
-  box-shadow: none;
-  transform: none;
-}
-.mkt-kpi-row .kpi-card + .kpi-card {
-  border-left: 1px solid var(--border);
-  padding-left: 14px;
 }
 
 .mkt-note {
@@ -1304,7 +1284,7 @@ html, body {
   position: relative;
   border-radius: var(--radius);
   background: var(--surface-2);
-  border: 1.5px solid var(--secondary-brand);
+  border: 1px solid var(--border);
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
@@ -1449,5 +1429,4 @@ html, body {
   .mkt-arrow        { transform: rotate(90deg); }
   .mkt-table-grid   { grid-template-columns: 1fr; }
   .mkt-kpi-row      { grid-template-columns: repeat(2, 1fr); }
-  .mkt-kpi-row .kpi-card + .kpi-card { border-left: none; padding-left: 0; }
 }

@@ -85,13 +85,13 @@ function Funnel({ f }) {
 
 // ── Chart constants ───────────────────────────────────────────────────────────
 const SOURCE_COLORS = {
-  facebook:            "#1877F2",
-  google:              "#34A853",
-  google_my_business:  "#FBBC05",
-  instagram:           "#E4405F",
-  klaviyo:             "#2D2D2D",
-  tiktok:              "#69C9D0",
-  Unknown:             "#999999",
+  facebook:            "var(--chart-cat-1)",
+  google:              "var(--chart-cat-2)",
+  google_my_business:  "var(--chart-cat-4)",
+  instagram:           "var(--chart-cat-6)",
+  klaviyo:             "var(--chart-cat-3)",
+  tiktok:              "var(--chart-cat-5)",
+  Unknown:             "var(--text-light)",
 };
 const PIE_COLORS = [
   "var(--chart-cat-1)", "var(--chart-cat-2)", "var(--chart-cat-3)",
@@ -129,7 +129,7 @@ function SpendLineChart({ data }) {
           <Tooltip
             labelFormatter={fmtDate}
             formatter={(v) => [amt(v), undefined]}
-            contentStyle={{ fontSize: 11, background: "var(--card-bg)", border: "1px solid var(--border)" }}
+            contentStyle={{ fontSize: 11, background: "var(--surface-2)", border: "1px solid var(--border)" }}
           />
           <Legend wrapperStyle={{ fontSize: 10 }} />
           {sources.map(src => (

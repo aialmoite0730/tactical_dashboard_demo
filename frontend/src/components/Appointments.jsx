@@ -24,11 +24,11 @@ const post = async (base, path, body) => {
 
 // ─── Status palette ───────────────────────────────────────────────────────────
 const STATUS_COLORS = {
-  "Closed":           "var(--positive)",
-  "Closed (No Show)": "var(--negative)",
-  "Cancelled":        "var(--warning)",
-  "Open":             "var(--secondary-brand)",
-  "default":          "var(--text-light)",
+  "Closed":           "var(--chart-cat-1)",
+  "Closed (No Show)": "var(--chart-cat-4)",
+  "Cancelled":        "var(--chart-cat-5)",
+  "Open":             "var(--chart-cat-2)",
+  "default":          "var(--chart-cat-3)",
 };
 
 const C = {
@@ -206,12 +206,10 @@ export default function Appointments({ apiBase, month, center, onData, aiInsight
         {/* CORRECTED: rebook_rate = rebooked / closed (not / total) */}
         <KpiCard loading={loading} icon={<RepeatIcon size={17} />} label="Rebook Rate"
           value={rebookData ? rebookData.rebook_rate + "%" : null}
-          sub={rebookData ? `${fmtNum(rebookData.rebooked)} of ${fmtNum(rebookData.closed)} closed` : null}
-          note="Rebooked ÷ Completed" />
+          sub={rebookData ? `${fmtNum(rebookData.rebooked)} of ${fmtNum(rebookData.closed)} closed` : null} />
         <KpiCard loading={loading} icon={<UserPlusIcon size={17} />} label="First-Visit Rate"
           value={rebookData ? rebookData.first_visit_rate + "%" : null}
-          sub={rebookData ? `${fmtNum(rebookData.first_visits)} new guests` : null}
-          note="First visits ÷ Completed" />
+          sub={rebookData ? `${fmtNum(rebookData.first_visits)} new guests` : null} />
       </div>
 
       {/* ── KPI Row 2: Ops ── */}
@@ -221,8 +219,7 @@ export default function Appointments({ apiBase, month, center, onData, aiInsight
         <KpiCard loading={loading} icon={<ZapIcon size={17} />} label="Surprise Visits"
           value={summary ? fmtNum(summary.surprise_visits) : null} />
         <KpiCard loading={loading} icon={<GaugeIcon size={17} />} label="Utilisation"
-          value={summary ? summary.utilisation_pct + "%" : null}
-          note="Sched. min ÷ (days × 10h × 60)" />
+          value={summary ? summary.utilisation_pct + "%" : null} />
         <KpiCard loading={loading} icon={<ClockIcon size={17} />} label="Avg. Duration"
           value={summary?.avg_actual_duration_min != null
             ? summary.avg_actual_duration_min + " min"
@@ -248,7 +245,7 @@ export default function Appointments({ apiBase, month, center, onData, aiInsight
                          tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
                   <YAxis tick={{ fontSize: 9, fill: C.muted }} />
                   <Tooltip content={<ChartTip />} />
-                  <Bar dataKey="count" name="Appointments" fill={C.bar} radius={[2,2,0,0]} />
+                  <Bar dataKey="count" name="Appointments" fill="var(--accent)" radius={[2,2,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -319,7 +316,7 @@ export default function Appointments({ apiBase, month, center, onData, aiInsight
                     formatter={v => [fmtNum(v), "Appointments"]}
                     labelFormatter={h => `${h}:00 – ${h+1}:00`}
                   />
-                  <Bar dataKey="count" name="Appointments" fill={C.bar2} radius={[2,2,0,0]} />
+                  <Bar dataKey="count" name="Appointments" fill="var(--accent)" radius={[2,2,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -341,7 +338,7 @@ export default function Appointments({ apiBase, month, center, onData, aiInsight
                     value={r.count}
                     max={maxProv}
                     pctLabel={r.pct + "%"}
-                    color={C.bar}
+                    color="var(--accent)"
                     subLabel={`✓ ${fmtNum(r.closed_count)} · rebook ${r.rebook_rate}%`}
                   />
                 ))}
@@ -359,7 +356,7 @@ export default function Appointments({ apiBase, month, center, onData, aiInsight
                     value={r.count}
                     max={maxSrc}
                     pctLabel={r.pct + "%"}
-                    color={C.bar2}
+                    color="var(--accent)"
                   />
                 ))}
         </SCard>

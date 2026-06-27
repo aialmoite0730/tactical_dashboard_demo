@@ -51,7 +51,6 @@ function KpiCard({ label, value, sub, highlight, icon }) {
 }
 
 function UtilBar({ label, role, scheduledHrs, bookedHrs, utilPct, revPerHour }) {
-  const color = utilPct >= 80 ? C.good : utilPct >= 50 ? C.warn : C.crit;
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
@@ -60,7 +59,7 @@ function UtilBar({ label, role, scheduledHrs, bookedHrs, utilPct, revPerHour }) 
           {role && <span style={{ marginLeft: 6, fontSize: 10, color: C.muted }}>{role}</span>}
         </div>
         <div style={{ textAlign: "right", fontSize: 10, color: C.muted }}>
-          <span style={{ color, fontWeight: 700 }}>{utilPct}%</span>
+          <span style={{ color: utilPct >= 80 ? "var(--positive)" : utilPct >= 60 ? "var(--warning)" : "var(--negative)", fontWeight: 700 }}>{utilPct}%</span>
           <span style={{ margin: "0 6px" }}>·</span>
           {fmtNum(bookedHrs, 1)}h / {fmtNum(scheduledHrs, 1)}h
           {revPerHour != null && (
@@ -71,7 +70,7 @@ function UtilBar({ label, role, scheduledHrs, bookedHrs, utilPct, revPerHour }) 
       <div style={{ height: 7, background: "var(--grid)", borderRadius: 4 }}>
         <div style={{
           height: 7, width: Math.min(utilPct, 100) + "%",
-          background: color, borderRadius: 4, transition: "width .6s ease",
+          background: "var(--accent)", borderRadius: 4, transition: "width .6s ease",
         }}/>
       </div>
     </div>
@@ -134,15 +133,13 @@ export default function Utilization({ apiBase, month, center, onData, aiInsights
       {/* ── Summary KPIs ── */}
       <div className="kpi-row">
         <KpiCard highlight icon={<GaugeIcon size={17} />} label="Avg. Utilisation"
-          value={avgUtil !== "—" ? avgUtil + "%" : "—"}
-          sub="booked ÷ scheduled hrs" />
+          value={avgUtil !== "—" ? avgUtil + "%" : "—"} />
         <KpiCard icon={<ClockIcon size={17} />} label="Total Booked Hours"
           value={fmtNum(totalBooked, 1) + " h"} />
         <KpiCard icon={<CalendarIcon size={17} />} label="Total Sched. Hours"
           value={fmtNum(totalSched, 1) + " h"} />
         <KpiCard icon={<TrendingUpIcon size={17} />} label="Revenue / Util. Hour"
-          value={fmt(avgRevHr, true)}
-          sub="total rev ÷ booked hrs" />
+          value={fmt(avgRevHr, true)} />
         <KpiCard icon={<DollarIcon size={17} />} label="Total Revenue (linked)"
           value={fmt(totalRev, true)} />
       </div>
@@ -155,9 +152,6 @@ export default function Utilization({ apiBase, month, center, onData, aiInsights
         <div className="chart-card"><Skeleton h={120} /></div>
       ) : loaded && roleSummary.length > 0 ? (
         <div className="weekly-card">
-          <div style={{ padding: "10px 16px 6px", fontSize: 11, color: C.muted, fontStyle: "italic" }}>
-            Utilization &amp; Revenue by Role — joined on serviced_by + date + center
-          </div>
           <table className="weekly-table">
             <thead>
               <tr>
@@ -180,7 +174,7 @@ export default function Utilization({ apiBase, month, center, onData, aiInsights
                   <td style={{ textAlign: "right" }}>
                     <span style={{
                       fontWeight: 700,
-                      color: r.utilization_pct >= 80 ? C.good : r.utilization_pct >= 50 ? C.warn : C.crit,
+                      color: r.utilization_pct >= 80 ? "var(--positive)" : r.utilization_pct >= 60 ? "var(--warning)" : "var(--negative)",
                     }}>
                       {r.utilization_pct}%
                     </span>
@@ -202,9 +196,9 @@ export default function Utilization({ apiBase, month, center, onData, aiInsights
             ? [1,2,3,4,5].map(i => <div key={i} style={{ marginBottom: 12 }}><Skeleton h={32} /></div>)
             : providers.length === 0
               ? <div className="chart-empty">No schedule data</div>
-              : providers.map(r => (
+              : providers.map((r, i) => (
                   <UtilBar
-                    key={r.employee + r.center}
+                    key={`${r.employee}-${r.center}-${i}`}
                     label={r.employee}
                     role={r.role}
                     scheduledHrs={r.scheduled_hours}
@@ -222,9 +216,9 @@ export default function Utilization({ apiBase, month, center, onData, aiInsights
             ? [1,2,3,4,5].map(i => <div key={i} style={{ marginBottom: 12 }}><Skeleton h={32} /></div>)
             : revPerHour.length === 0
               ? <div className="chart-empty">No data — check join: serviced_by + date + center</div>
-              : revPerHour.map(r => (
+              : revPerHour.map((r, i) => (
                   <UtilBar
-                    key={r.employee + r.center}
+                    key={`${r.employee}-${r.center}-rph-${i}`}
                     label={r.employee}
                     role={r.role}
                     scheduledHrs={r.scheduled_hours}
